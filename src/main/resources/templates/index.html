@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LivestockPro - Digital Livestock Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .hero-gradient {
+            background: linear-gradient(135deg, #10b981 0%, #059669 25%, #047857 50%, #065f46 100%);
+        }
+
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+
+        .card-hover:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+
+        #three-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: -1;
+            opacity: 0.3;
+        }
+
+        .text-shadow {
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            transform: scale(0.7) translateY(-50px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+        }
+
+        .input-group {
+            position: relative;
+        }
+
+        .input-group input:focus + label,
+        .input-group input:not(:placeholder-shown) + label {
+            transform: translateY(-20px) scale(0.8);
+            color: #10b981;
+        }
+
+        .input-group label {
+            position: absolute;
+            top: 50%;
+            left: 12px;
+            transform: translateY(-50%);
+            transition: all 0.2s ease;
+            pointer-events: none;
+            color: #9ca3af;
+        }
+
+        .input-group input {
+            padding-top: 20px;
+        }
+
+        /* Enhanced mobile menu */
+        .mobile-menu {
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .mobile-menu.active {
+            transform: translateX(0);
+        }
+
+        @media (max-width: 768px) {
+            .hero-text {
+                font-size: 2.5rem;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .hero-text {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white overflow-x-hidden">
+<canvas id="three-canvas"></canvas>
+
+<!-- Navigation -->
+<nav class="fixed top-0 w-full z-50 glass-effect">
+    <div class="container mx-auto px-4 sm:px-6 py-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-green-400 to-green-600 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-cow text-white text-lg sm:text-xl"></i>
+                </div>
+                <span class="text-xl sm:text-2xl font-bold text-white">LivestockPro</span>
+            </div>
+
+            <!-- Desktop Navigation -->
+            <div class="hidden md:flex space-x-8">
+                <a href="#home" class="hover:text-green-400 transition-colors">Home</a>
+                <a href="#features" class="hover:text-green-400 transition-colors">Features</a>
+                <a href="#about" class="hover:text-green-400 transition-colors">About</a>
+                <a href="#contact" class="hover:text-green-400 transition-colors">Contact</a>
+            </div>
+
+            <!-- Desktop Auth Buttons -->
+            <div class="hidden md:flex space-x-4">
+                <button id="loginBtn" class="px-4 py-2 border border-green-400 text-green-400 rounded-lg hover:bg-green-400 hover:text-white transition-colors">
+                    Login
+                </button>
+                <button id="signupBtn" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+                    Sign Up
+                </button>
+            </div>
+
+            <!-- Mobile Menu Button -->
+            <button id="mobileMenuBtn" class="md:hidden text-white text-xl">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Mobile Menu -->
+    <div id="mobileMenu" class="mobile-menu fixed top-0 right-0 h-full w-64 bg-gray-900/95 backdrop-blur-lg md:hidden">
+        <div class="p-6">
+            <button id="closeMobileMenu" class="text-white text-xl mb-8">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="space-y-6">
+                <a href="#home" class="block text-white hover:text-green-400 transition-colors text-lg">Home</a>
+                <a href="#features" class="block text-white hover:text-green-400 transition-colors text-lg">Features</a>
+                <a href="#about" class="block text-white hover:text-green-400 transition-colors text-lg">About</a>
+                <a href="#contact" class="block text-white hover:text-green-400 transition-colors text-lg">Contact</a>
+                <div class="pt-6 space-y-4">
+                    <button id="mobileLoginBtn" class="w-full px-4 py-3 border border-green-400 text-green-400 rounded-lg hover:bg-green-400 hover:text-white transition-colors">
+                        Login
+                    </button>
+                    <button id="mobileSignupBtn" class="w-full px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+                        Sign Up
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- Login Modal -->
+<div id="loginModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center px-4">
+    <div class="modal-content bg-gray-800 rounded-2xl p-6 sm:p-8 w-full max-w-md glass-effect">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl sm:text-3xl font-bold text-white">Welcome Back</h2>
+            <button id="closeLogin" class="text-gray-400 hover:text-white text-xl">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <form class="space-y-6">
+            <div class="input-group">
+                <input type="email" id="loginEmail" placeholder=" " required class="w-full px-3 py-4 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:border-green-400 focus:outline-none transition-colors">
+                <label for="loginEmail" class="text-gray-400">Email Address</label>
+            </div>
+
+            <div class="input-group">
+                <input type="password" id="loginPassword" placeholder=" " required class="w-full px-3 py-4 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:border-green-400 focus:outline-none transition-colors">
+                <label for="loginPassword" class="text-gray-400">Password</label>
+            </div>
+
+            <div class="flex items-center justify-between text-sm">
+                <label class="flex items-center text-gray-300">
+                    <input type="checkbox" class="mr-2 rounded border-gray-600 text-green-500 focus:ring-green-400">
+                    Remember me
+                </label>
+                <a href="#" class="text-green-400 hover:text-green-300">Forgot password?</a>
+            </div>
+
+            <button type="submit" class="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold rounded-lg hover:from-green-600 hover:to-green-700 transition-all transform hover:scale-105">
+                <i class="fas fa-sign-in-alt mr-2"></i>
+                Sign In
+            </button>
+        </form>
+
+        <div class="mt-6 text-center">
+            <p class="text-gray-400">Don't have an account?
+                <button id="switchToSignup" class="text-green-400 hover:text-green-300 font-semibold">Sign up</button>
+            </p>
+        </div>
+
+        <div class="mt-6">
+            <div class="relative">
+                <div class="absolute inset-0 flex items-center">
+                    <div class="w-full border-t border-gray-600"></div>
+                </div>
+                <div class="relative flex justify-center text-sm">
+                    <span class="px-2 bg-gray-800 text-gray-400">Or continue with</span>
+                </div>
+            </div>
+
+            <div class="mt-4 grid grid-cols-2 gap-3">
+                <button class="px-4 py-3 border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-700 transition-colors">
+                    <i class="fab fa-google mr-2"></i>Google
+                </button>
+                <button class="px-4 py-3 border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-700 transition-colors">
+                    <i class="fab fa-facebook mr-2"></i>Facebook
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Signup Modal -->
+<div id="signupModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center px-4">
+    <div class="modal-content bg-gray-800 rounded-2xl p-6 sm:p-8 w-full max-w-md glass-effect">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl sm:text-3xl font-bold text-white">Join LivestockPro</h2>
+            <button id="closeSignup" class="text-gray-400 hover:text-white text-xl">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <form class="space-y-6">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="input-group">
+                    <input type="text" id="firstName" placeholder=" " required class="w-full px-3 py-4 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:border-green-400 focus:outline-none transition-colors">
+                    <label for="firstName" class="text-gray-400">First Name</label>
+                </div>
+                <div class="input-group">
+                    <input type="text" id="lastName" placeholder=" " required class="w-full px-3 py-4 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:border-green-400 focus:outline-none transition-colors">
+                    <label for="lastName" class="text-gray-400">Last Name</label>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <input type="email" id="signupEmail" placeholder=" " required class="w-full px-3 py-4 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:border-green-400 focus:outline-none transition-colors">
+                <label for="signupEmail" class="text-gray-400">Email Address</label>
+            </div>
+
+            <div class="input-group">
+                <input type="tel" id="phoneNumber" placeholder=" " required class="w-full px-3 py-4 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:border-green-400 focus:outline-none transition-colors">
+                <label for="phoneNumber" class="text-gray-400">Phone Number</label>
+            </div>
+
+            <div class="input-group">
+                <select id="userType" required class="w-full px-3 py-4 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:border-green-400 focus:outline-none transition-colors">
+                    <option value="">Select User Type</option>
+                    <option value="farmer">Farmer</option>
+                    <option value="buyer">Buyer</option>
+                    <option value="veterinarian">Veterinarian</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <input type="password" id="signupPassword" placeholder=" " required class="w-full px-3 py-4 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:border-green-400 focus:outline-none transition-colors">
+                <label for="signupPassword" class="text-gray-400">Password</label>
+            </div>
+
+            <div class="input-group">
+                <input type="password" id="confirmPassword" placeholder=" " required class="w-full px-3 py-4 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:border-green-400 focus:outline-none transition-colors">
+                <label for="confirmPassword" class="text-gray-400">Confirm Password</label>
+            </div>
+
+            <div class="flex items-start space-x-2">
+                <input type="checkbox" id="agreeTerms" required class="mt-1 rounded border-gray-600 text-green-500 focus:ring-green-400">
+                <label for="agreeTerms" class="text-sm text-gray-300">
+                    I agree to the <a href="#" class="text-green-400 hover:text-green-300">Terms of Service</a> and <a href="#" class="text-green-400 hover:text-green-300">Privacy Policy</a>
+                </label>
+            </div>
+
+            <button type="submit" class="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold rounded-lg hover:from-green-600 hover:to-green-700 transition-all transform hover:scale-105">
+                <i class="fas fa-user-plus mr-2"></i>
+                Create Account
+            </button>
+        </form>
+
+        <div class="mt-6 text-center">
+            <p class="text-gray-400">Already have an account?
+                <button id="switchToLogin" class="text-green-400 hover:text-green-300 font-semibold">Sign in</button>
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Hero Section -->
+<section id="home" class="min-h-screen flex items-center justify-center hero-gradient relative overflow-hidden">
+    <div class="container mx-auto px-4 sm:px-6 text-center relative z-10">
+        <div class="animate-float">
+            <div class="w-24 h-24 sm:w-32 sm:h-32 mx-auto mb-8 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                <i class="fas fa-horse text-4xl sm:text-6xl text-white"></i>
+            </div>
+        </div>
+
+        <h1 class="hero-text text-4xl sm:text-6xl md:text-8xl font-bold mb-6 text-shadow">
+            Transform Your
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">
+                    Livestock
+                </span>
+            <br>Management
+        </h1>
+
+        <p class="text-lg sm:text-xl md:text-2xl mb-8 max-w-3xl mx-auto text-green-100 px-4">
+            Revolutionize your farming with digital records, virtual marketplace, and real-time alerts.
+            Empowering Kenyan farmers with cutting-edge technology.
+        </p>
+
+        <div class="flex flex-col sm:flex-row gap-4 justify-center px-4">
+            <button class="px-6 sm:px-8 py-3 sm:py-4 bg-white text-green-600 font-bold text-base sm:text-lg rounded-full hover:bg-gray-100 transition-colors btn-pulse">
+                <i class="fas fa-rocket mr-2"></i>
+                Get Started Free
+            </button>
+            <button class="px-6 sm:px-8 py-3 sm:py-4 border-2 border-white text-white font-bold text-base sm:text-lg rounded-full hover:bg-white hover:text-green-600 transition-colors">
+                <i class="fas fa-play mr-2"></i>
+                Watch Demo
+            </button>
+        </div>
+    </div>
+
+    <!-- Floating Elements -->
+    <div class="absolute top-20 left-4 sm:left-10 animate-float" style="animation-delay: -1s;">
+        <div class="w-12 h-12 sm:w-16 sm:h-16 bg-white/10 rounded-full backdrop-blur-sm flex items-center justify-center">
+            <i class="fas fa-chart-line text-lg sm:text-2xl text-white"></i>
+        </div>
+    </div>
+
+    <div class="absolute bottom-20 right-4 sm:right-10 animate-float" style="animation-delay: -3s;">
+        <div class="w-16 h-16 sm:w-20 sm:h-20 bg-white/10 rounded-full backdrop-blur-sm flex items-center justify-center">
+            <i class="fas fa-mobile-alt text-2xl sm:text-3xl text-white"></i>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section id="features" class="py-16 sm:py-20 bg-gradient-to-b from-gray-900 to-gray-800">
+    <div class="container mx-auto px-4 sm:px-6">
+        <div class="text-center mb-12 sm:mb-16">
+            <h2 class="text-3xl sm:text-5xl font-bold mb-6">
+                Powerful
+                <span class="text-green-400">Features</span>
+            </h2>
+            <p class="text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto px-4">
+                Everything you need to manage your livestock efficiently and profitably
+            </p>
+        </div>
+
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+            <!-- Feature Card 1 -->
+            <div class="card-hover bg-gradient-to-br from-green-500/20 to-green-600/20 p-6 sm:p-8 rounded-2xl glass-effect">
+                <div class="w-12 h-12 sm:w-16 sm:h-16 bg-green-500 rounded-2xl flex items-center justify-center mb-4 sm:mb-6">
+                    <i class="fas fa-database text-xl sm:text-2xl text-white"></i>
+                </div>
+                <h3 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Digital Records</h3>
+                <p class="text-gray-300 mb-4 sm:mb-6 text-sm sm:text-base">
+                    Keep track of every animal's breed, age, vaccination history, health information, and feeding regimens in one secure platform.
+                </p>
+                <button class="text-green-400 font-semibold hover:text-green-300 transition-colors text-sm sm:text-base">
+                    Learn More <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+
+            <!-- Feature Card 2 -->
+            <div class="card-hover bg-gradient-to-br from-blue-500/20 to-blue-600/20 p-6 sm:p-8 rounded-2xl glass-effect">
+                <div class="w-12 h-12 sm:w-16 sm:h-16 bg-blue-500 rounded-2xl flex items-center justify-center mb-4 sm:mb-6">
+                    <i class="fas fa-store text-xl sm:text-2xl text-white"></i>
+                </div>
+                <h3 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Virtual Marketplace</h3>
+                <p class="text-gray-300 mb-4 sm:mb-6 text-sm sm:text-base">
+                    List your cattle with photos and detailed information. Connect with buyers without traveling to physical markets.
+                </p>
+                <button class="text-blue-400 font-semibold hover:text-blue-300 transition-colors text-sm sm:text-base">
+                    Learn More <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+
+            <!-- Feature Card 3 -->
+            <div class="card-hover bg-gradient-to-br from-purple-500/20 to-purple-600/20 p-6 sm:p-8 rounded-2xl glass-effect">
+                <div class="w-12 h-12 sm:w-16 sm:h-16 bg-purple-500 rounded-2xl flex items-center justify-center mb-4 sm:mb-6">
+                    <i class="fas fa-bell text-xl sm:text-2xl text-white"></i>
+                </div>
+                <h3 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Real-time Alerts</h3>
+                <p class="text-gray-300 mb-4 sm:mb-6 text-sm sm:text-base">
+                    Get instant notifications about weather changes and disease outbreaks to protect your livestock investments.
+                </p>
+                <button class="text-purple-400 font-semibold hover:text-purple-300 transition-colors text-sm sm:text-base">
+                    Learn More <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+
+            <!-- Feature Card 4 -->
+            <div class="card-hover bg-gradient-to-br from-orange-500/20 to-orange-600/20 p-6 sm:p-8 rounded-2xl glass-effect">
+                <div class="w-12 h-12 sm:w-16 sm:h-16 bg-orange-500 rounded-2xl flex items-center justify-center mb-4 sm:mb-6">
+                    <i class="fas fa-user-md text-xl sm:text-2xl text-white"></i>
+                </div>
+                <h3 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Vet Integration</h3>
+                <p class="text-gray-300 mb-4 sm:mb-6 text-sm sm:text-base">
+                    Connect directly with veterinarians for health consultations, treatment tracking, and preventive care.
+                </p>
+                <button class="text-orange-400 font-semibold hover:text-orange-300 transition-colors text-sm sm:text-base">
+                    Learn More <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+
+            <!-- Feature Card 5 -->
+            <div class="card-hover bg-gradient-to-br from-pink-500/20 to-pink-600/20 p-6 sm:p-8 rounded-2xl glass-effect">
+                <div class="w-12 h-12 sm:w-16 sm:h-16 bg-pink-500 rounded-2xl flex items-center justify-center mb-4 sm:mb-6">
+                    <i class="fas fa-search text-xl sm:text-2xl text-white"></i>
+                </div>
+                <h3 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Smart Search</h3>
+                <p class="text-gray-300 mb-4 sm:mb-6 text-sm sm:text-base">
+                    Advanced search functionality for farmers, buyers, and vets with filters for breed, location, and health status.
+                </p>
+                <button class="text-pink-400 font-semibold hover:text-pink-300 transition-colors text-sm sm:text-base">
+                    Learn More <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+
+            <!-- Feature Card 6 -->
+            <div class="card-hover bg-gradient-to-br from-teal-500/20 to-teal-600/20 p-6 sm:p-8 rounded-2xl glass-effect">
+                <div class="w-12 h-12 sm:w-16 sm:h-16 bg-teal-500 rounded-2xl flex items-center justify-center mb-4 sm:mb-6">
+                    <i class="fas fa-mobile-alt text-xl sm:text-2xl text-white"></i>
+                </div>
+                <h3 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Mobile Ready</h3>
+                <p class="text-gray-300 mb-4 sm:mb-6 text-sm sm:text-base">
+                    Access your livestock data anytime, anywhere with our responsive design that works on all devices.
+                </p>
+                <button class="text-teal-400 font-semibold hover:text-teal-300 transition-colors text-sm sm:text-base">
+                    Learn More <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Statistics Section -->
+<section class="py-16 sm:py-20 bg-green-600">
+    <div class="container mx-auto px-4 sm:px-6">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 text-center">
+            <div class="animate-float" style="animation-delay: -0.5s;">
+                <div class="text-2xl sm:text-4xl font-bold mb-2">10,000+</div>
+                <div class="text-green-100 text-sm sm:text-base">Active Farmers</div>
+            </div>
+            <div class="animate-float" style="animation-delay: -1s;">
+                <div class="text-2xl sm:text-4xl font-bold mb-2">50,000+</div>
+                <div class="text-green-100 text-sm sm:text-base">Livestock Tracked</div>
+            </div>
+            <div class="animate-float" style="animation-delay: -1.5s;">
+                <div class="text-2xl sm:text-4xl font-bold mb-2">1,000+</div>
+                <div class="text-green-100 text-sm sm:text-base">Successful Sales</div>
+            </div>
+            <div class="animate-float" style="animation-delay: -2s;">
+                <div class="text-2xl sm:text-4xl font-bold mb-2">500+</div>
+                <div class="text-green-100 text-sm sm:text-base">Partner Vets</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section class="py-16 sm:py-20 bg-gradient-to-r from-gray-800 to-gray-900">
+    <div class="container mx-auto px-4 sm:px-6 text-center">
+        <h2 class="text-3xl sm:text-5xl font-bold mb-6">
+            Ready to Transform Your
+            <span class="text-green-400">Farming?</span>
+        </h2>
+        <p class="text-lg sm:text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
+            Join thousands of farmers who have already revolutionized their livestock management with LivestockPro.
+        </p>
+        <button class="px-8 sm:px-12 py-3 sm:py-4 bg-gradient-to-r from-green-500 to-green-600 text-white font-bold text-lg sm:text-xl rounded-full hover:from-green-600 hover:to-green-700 transition-all transform hover:scale-105">
+            <i class="fas fa-rocket mr-2"></i>
+            Start Your Free Trial
+        </button>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer class="bg-gray-900 py-8 sm:py-12">
+    <div class="container mx-auto px-4 sm:px-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
+            <div class="col-span-1 sm:col-span-2 md:col-span-1">
+                <div class="flex items-center space-x-2 mb-4">
+                    <div class="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-cow text-white"></i>
+                    </div>
+                    <span class="text-xl font-bold">LivestockPro</span>
+                </div>
+                <p class="text-gray-400 text-sm sm:text-base">
+                    Empowering Kenyan farmers with digital livestock management solutions.
+                </p>
+            </div>
+
+            <div>
+                <h3 class="font-bold mb-4">Features</h3>
+                <ul class="space-y-2 text-gray-400 text-sm sm:text-base">
+                    <li><a href="#" class="hover:text-green-400">Digital Records</a></li>
+                    <li><a href="#" class="hover:text-green-400">Marketplace</a></li>
+                    <li><a href="#" class="hover:text-green-400">Vet Services</a></li>
+                    <li><a href="#" class="hover:text-green-400">Alerts</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <h3 class="font-bold mb-4">Support</h3>
+                <ul class="space-y-2 text-gray-400 text-sm sm:text-base">
+                    <li><a href="#" class="hover:text-green-400">Help Center</a></li>
+                    <li><a href="#" class="hover:text-green-400">Documentation</a></li>
+                    <li><a href="#" class="hover:text-green-400">Contact Us</a></li>
+                    <li><a href="#" class="hover:text-green-400">Training</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <h3 class="font-bold mb-4">Connect</h3>
+                <div class="flex space-x-4">
+                    <a href="#" class="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center hover:bg-green-500 transition-colors">
+                        <i class="fab fa-facebook"></i>
+                    </a>
+                    <a href="#" class="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center hover:bg-green-500 transition-colors">
+                        <i class="fab fa-twitter"></i>
+                    </a>
+                    <a href="#" class="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center hover:bg-green-500 transition-colors">
+                        <i class="fab fa-linkedin"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="border-t border-gray-700 mt-6 sm:mt-8 pt-6 sm:pt-8 text-center text-gray-400 text-sm sm:text-base">
+            <p>&copy; 2024 LivestockPro. All rights reserved. Made with ❤️ for Kenyan farmers.</p>
+        </div>
+    </div>
+</footer>
+
+<script>
+    // Modal functionality
+    const loginModal = document.getElementById('loginModal');
+    const signupModal = document.getElementById('signupModal');
+    const loginBtn = document.getElementById('loginBtn');
+    const signupBtn = document.getElementById('signupBtn');
+    const mobileLoginBtn = document.getElementById('mobileLoginBtn');
+    const mobileSignupBtn = document.getElementById('mobileSignupBtn');
+    const closeLogin = document.getElementById('closeLogin');
+    const closeSignup = document.getElementById('closeSignup');
+    const switchToSignup = document.getElementById('switchToSignup');
+    const switchToLogin = document.getElementById('switchToLogin');
+
+    // Mobile menu functionality
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const mobileMenu = document.getElementById('mobileMenu');
+    const closeMobileMenu = document.getElementById('closeMobileMenu');
+
+    function openModal(modal) {
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal(modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = 'auto';
+    }
+
+    // Login modal events
+    loginBtn.addEventListener('click', () => openModal(loginModal));
+    mobileLoginBtn.addEventListener('click', () => {
+        closeMobileMenuFunc();
+        openModal(loginModal);
+    });
+    closeLogin.addEventListener('click', () => closeModal(loginModal));
+
+    // Signup modal events
+    signupBtn.addEventListener('click', () => openModal(signupModal));
+    mobileSignupBtn.addEventListener('click', () => {
+        closeMobileMenuFunc();
+        openModal(signupModal);
+    });
+    closeSignup.addEventListener('click', () => closeModal(signupModal));
+
+    // Switch between modals
+    switchToSignup.addEventListener('click', () => {
+        closeModal(loginModal);
+        openModal(signupModal);
+    });
+
+    switchToLogin.addEventListener('click', () => {
+        closeModal(signupModal);
+        openModal(loginModal);
+    });
+
+    // Close modals when clicking outside
+    loginModal.addEventListener('click', (e) => {
+        if (e.target === loginModal) {
+            closeModal(loginModal);
+        }
+    });
+
+    signupModal.addEventListener('click', (e) => {
+        if (e.target === signupModal) {
+            closeModal(signupModal);
+        }
+    });
+
+    // Mobile menu functions
+    function openMobileMenu() {
+        mobileMenu.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeMobileMenuFunc() {
+        mobileMenu.classList.remove('active');
+        document.body.style.overflow = 'auto';
+    }
+
+    mobileMenuBtn.addEventListener('click', openMobileMenu);
+    closeMobileMenu.addEventListener('click', closeMobileMenuFunc);
+
+    // Close mobile menu when clicking on links
+    const mobileLinks = mobileMenu.querySelectorAll('a');
+    mobileLinks.forEach(link => {
+        link.addEventListener('click', closeMobileMenuFunc);
+    });
+
+    // Form validation
+    document.getElementById('signupModal').querySelector('form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const password = document.getElementById('signupPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+
+        if (password !== confirmPassword) {
+            alert('Passwords do not match!');
+            return;
+        }
+
+        if (password.length < 8) {
+            alert('Password must be at least 8 characters long!');
+            return;
+        }
+
+        alert('Account created successfully!');
+        closeModal(signupModal);
+    });
+
+    document.getElementById('loginModal').querySelector('form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        alert('Login successful!');
+        closeModal(loginModal);
+    });
+
+    // Three.js Background Animation
+    let scene, camera, renderer, particles;
+
+    function initThree() {
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        renderer = new THREE.WebGLRenderer({
+            canvas: document.getElementById('three-canvas'),
+            alpha: true
+        });
+
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+        // Create particles
+        const geometry = new THREE.BufferGeometry();
+        const vertices = [];
+
+        for (let i = 0; i < 1000; i++) {
+            vertices.push(
+                (Math.random() - 0.5) * 2000,
+                (Math.random() - 0.5) * 2000,
+                (Math.random() - 0.5) * 2000
+            );
+        }
+
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+
+        const material = new THREE.PointsMaterial({
+            color: 0x10b981,
+            size: 2,
+            transparent: true,
+            opacity: 0.6
+        });
+
+        particles = new THREE.Points(geometry, material);
+        scene.add(particles);
+
+        camera.position.z = 500;
+
+        animate();
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+
+        particles.rotation.x += 0.001;
+        particles.rotation.y += 0.002;
+
+        renderer.render(scene, camera);
+    }
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Smooth scrolling for navigation links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
+    });
+
+    // Initialize Three.js when page loads
+    window.addEventListener('load', initThree);
+
+    // Add scroll effect to navbar
+    window.addEventListener('scroll', () => {
+        const nav = document.querySelector('nav');
+        if (window.scrollY > 100) {
+            nav.classList.add('bg-gray-900/90');
+        } else {
+            nav.classList.remove('bg-gray-900/90');
+        }
+    });
+
+    // Add counter animation
+    function animateCounters() {
+        const counters = document.querySelectorAll('.text-2xl, .text-4xl');
+        counters.forEach(counter => {
+            const text = counter.textContent;
+            const target = parseInt(text.replace(/[^0-9]/g, ''));
+            if (target > 0) {
+                const increment = target / 100;
+                let current = 0;
+
+                const timer = setInterval(() => {
+                    current += increment;
+                    if (current >= target) {
+                        current = target;
+                        clearInterval(timer);
+                    }
+                    counter.textContent = Math.floor(current).toLocaleString() + '+';
+                }, 20);
+            }
+        });
+    }
+
+    // Trigger counter animation when section is visible
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                animateCounters();
+            }
+        });
+    });
+
+    const statsSection = document.querySelector('.bg-green-600');
+    if (statsSection) {
+        observer.observe(statsSection);
+    }
+
+    // Close mobile menu on escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            if (mobileMenu.classList.contains('active')) {
+                closeMobileMenuFunc();
+            }
+            if (loginModal.classList.contains('active')) {
+                closeModal(loginModal);
+            }
+            if (signupModal.classList.contains('active')) {
+                closeModal(signupModal);
+            }
+        }
+    });
+
+    // Add loading animation to buttons
+    function addLoadingToButton(button, originalText) {
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Loading...';
+        button.disabled = true;
+
+        setTimeout(() => {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }, 2000);
+    }
+
+    // Enhanced form interactions
+    const inputs = document.querySelectorAll('input, select');
+    inputs.forEach(input => {
+        input.addEventListener('focus', function() {
+            this.parentElement.classList.add('focused');
+        });
+
+        input.addEventListener('blur', function() {
+            if (!this.value) {
+                this.parentElement.classList.remove('focused');
+            }
+        });
+    });
+</script>
+</body>
+</html>
