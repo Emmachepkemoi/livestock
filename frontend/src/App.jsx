@@ -1,61 +1,45 @@
+// src/App.jsx
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+
 import LoginPage from './pages/auth/LoginPage';
 import SignupPage from './pages/auth/SignupPage';
 import Dashboard from './pages/Dashboard';
+import VetDashboard from './pages/VetDashboard';
+import AdminDashboard from './pages/AdminDashboard';
+import LoadingSpinner from './components/common/LoadingSpinner';
+
 import authService from './services/authService';
-
-// Protected Route Component
-const ProtectedRoute = ({ children }) => {
-    return authService.isAuthenticated() ? children : <Navigate to="/" replace />;
-};
-
-// Public Route Component
-const PublicRoute = ({ children }) => {
-    return !authService.isAuthenticated() ? children : <Navigate to="/dashboard" replace />;
-};
 
 function App() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const checkAuthStatus = async () => {
-            if (authService.isAuthenticated()) {
-                try {
-                    const response = await authService.getCurrentUser();
-                    console.log('Current user response:', response);
+        const initializeUser = async () => {
+            try {
+                const token = authService.getToken();
+                const storedUser = authService.getCurrentUser();
 
-                    // Handle different response structures
-                    const userData = response.data || response;
-                    setUser(userData);
-                } catch (error) {
-                    console.error('Failed to get user data:', error);
-
-                    // Try to get stored user data as fallback
-                    const storedUserData = authService.getStoredUserData();
-                    if (storedUserData) {
-                        console.log('Using stored user data as fallback:', storedUserData);
-                        setUser(storedUserData);
-                    } else {
-                        // If no stored data, logout user
-                        authService.logout();
-                    }
+                if (token && storedUser) {
+                    setUser(storedUser);
                 }
+            } catch (error) {
+                console.error("Failed to load user:", error);
+                authService.logout();
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
 
-        checkAuthStatus();
+        initializeUser();
     }, []);
 
     const handleLogin = (userData) => {
-        console.log('Login userData received:', userData);
-
-        // Handle different response structures from login/signup
-        // Your registration response shows: { success: true, message: '...', data: {...} }
-        const user = userData.data || userData;
+        const { accessToken, ...user } = userData.data || userData;
+        authService.setToken(accessToken);
         setUser(user);
+        localStorage.setItem('user', JSON.stringify(user));
     };
 
     const handleLogout = () => {
@@ -64,60 +48,61 @@ function App() {
     };
 
     if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
-            </div>
-        );
+        return <LoadingSpinner />;
     }
 
     return (
         <Router>
             <Routes>
-                {/* Public Routes */}
-                <Route
-                    path="/"
-                    element={
-                        <PublicRoute>
-                            <LoginPage onLogin={handleLogin} />
-                        </PublicRoute>
-                    }
-                />
-                <Route
-                    path="/login"
-                    element={
-                        <PublicRoute>
-                            <LoginPage onLogin={handleLogin} />
-                        </PublicRoute>
-                    }
-                />
-                <Route
-                    path="/signup"
-                    element={
-                        <PublicRoute>
-                            <SignupPage onSignup={handleLogin} />
-                        </PublicRoute>
-                    }
-                />
+                <Route path="/" element={
+                    <PublicRoute>
+                        <LoginPage onLogin={handleLogin} />
+                    </PublicRoute>
+                } />
+                <Route path="/login" element={
+                    <PublicRoute>
+                        <LoginPage onLogin={handleLogin} />
+                    </PublicRoute>
+                } />
+                <Route path="/signup" element={
+                    <PublicRoute>
+                        <SignupPage onSignup={handleLogin} />
+                    </PublicRoute>
+                } />
+                <Route path="/dashboard" element={
+                    <ProtectedRoute>
+                        <Dashboard user={user} onLogout={handleLogout} />
+                    </ProtectedRoute>
+                } />
+                <Route path="/vet" element={<VetDashboard />} />
 
-                {/* Protected Routes */}
-                <Route
-                    path="/dashboard"
-                    element={
-                        <ProtectedRoute>
-                            <Dashboard user={user} onLogout={handleLogout} />
-                        </ProtectedRoute>
-                    }
-                />
+                <Route path="/admin" element={<AdminDashboard />} />
 
-                {/* Fallback Route */}
-                <Route
-                    path="*"
-                    element={<Navigate to={authService.isAuthenticated() ? "/dashboard" : "/"} replace />}
-                />
+                <Route path="*" element={
+                    <Navigate to={authService.isAuthenticated() ? "/dashboard" : "/"} replace />
+                } />
             </Routes>
         </Router>
     );
 }
+
+// Route Guards
+const ProtectedRoute = ({ children }) => {
+    return authService.isAuthenticated() ? children : <Navigate to="/" replace />;
+};
+
+const PublicRoute = ({ children }) => {
+    return !authService.isAuthenticated() ? children : <Navigate to="/dashboard" replace />;
+};
+
+const VetRoute = ({ children }) => {
+    const user = authService.getCurrentUser();
+    return user?.role === 'vet' ? children : <Navigate to="/" replace />;
+};
+
+const AdminRoute = ({ children }) => {
+    const user = authService.getCurrentUser();
+    return user?.role === 'admin' ? children : <Navigate to="/" replace />;
+};
 
 export default App;

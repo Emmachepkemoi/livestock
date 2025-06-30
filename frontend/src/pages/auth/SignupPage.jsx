@@ -64,16 +64,18 @@ function SignupPage({ onSignup }) {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     if (!validateForm()) return;
 
     setLoading(true);
     try {
       const { confirmPassword, ...signupData } = formData;
       const response = await authService.register(signupData);
-      onSignup(response.data.user);
+      onSignup(response?.user || response); // adjust as needed
     } catch (err) {
-      setErrors({ submit: err.response?.data?.message || 'Signup failed' });
+      const errorMsg = err?.message || 'Signup failed';
+      setErrors({ submit: errorMsg });
     } finally {
       setLoading(false);
     }
@@ -90,7 +92,7 @@ function SignupPage({ onSignup }) {
             <p className="text-gray-600 mt-2">Join FarmTech Livestock Management</p>
           </div>
 
-          <div className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Username *</label>
@@ -101,6 +103,7 @@ function SignupPage({ onSignup }) {
                       name="username"
                       value={formData.username}
                       onChange={handleChange}
+                      autoCapitalize="none"
                       className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 ${
                           errors.username ? 'border-red-300' : 'border-gray-300'
                       }`}
@@ -120,6 +123,7 @@ function SignupPage({ onSignup }) {
                       name="email"
                       value={formData.email}
                       onChange={handleChange}
+                      autoCapitalize="none"
                       className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 ${
                           errors.email ? 'border-red-300' : 'border-gray-300'
                       }`}
@@ -218,6 +222,7 @@ function SignupPage({ onSignup }) {
                   <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                       className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -253,8 +258,7 @@ function SignupPage({ onSignup }) {
             )}
 
             <button
-                type="button"
-                onClick={handleSubmit}
+                type="submit"
                 disabled={loading}
                 className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white font-semibold py-3 px-4 rounded-lg transition duration-200"
             >
@@ -269,7 +273,7 @@ function SignupPage({ onSignup }) {
                 </a>
               </p>
             </div>
-          </div>
+          </form>
         </div>
       </div>
   );
