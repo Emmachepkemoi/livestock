@@ -11,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZoneId;
 import java.util.*;
 
 @Service
@@ -160,7 +161,7 @@ public class UserService {
         userDto.setFirstName(user.getFirstName());
         userDto.setLastName(user.getLastName());
         userDto.setPhoneNumber(user.getPhoneNumber());
-        userDto.setCreatedAt(user.getCreatedAt());
+        userDto.setCreatedAt(Date.from(user.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant()));
         userDto.setLastLoginDate(user.getLastLoginDate());
         // Don't include password or other sensitive information
         return userDto;

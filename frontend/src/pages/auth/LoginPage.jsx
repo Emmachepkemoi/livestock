@@ -28,22 +28,22 @@ function LoginPage({ onLogin }) {
       const response = await authService.login(formData);
       console.log('Login response:', response);
 
-      const token = response.data.token;
-      if (token) {
-        localStorage.setItem('token', token); // ✅ Save JWT to localStorage
-        onLogin(response.data); // ✅ continue with the rest of your logic
+      // Check if login was successful
+      if (response && (response.data || response.accessToken)) {
+        // Call onLogin with the response data
+        onLogin(response);
       } else {
-        throw new Error('No token received from server');
+        throw new Error('Invalid response format from server');
       }
 
     } catch (err) {
+      console.error('Login error:', err);
       const message = err?.response?.data?.message || err.message || 'Login failed';
       setError(message);
     } finally {
       setLoading(false);
     }
   };
-
 
   return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
@@ -139,14 +139,6 @@ function LoginPage({ onLogin }) {
               Click here to sign up
             </Link>
           </div>
-
-          {/*/!* Demo Credentials *!/*/}
-          {/*<div className="mt-6 text-center">*/}
-          {/*  <p className="text-gray-600">*/}
-          {/*    Demo credentials: username: <span className="font-mono">demo</span>, password:{' '}*/}
-          {/*    <span className="font-mono">password</span>*/}
-          {/*  </p>*/}
-          {/*</div>*/}
         </div>
       </div>
   );

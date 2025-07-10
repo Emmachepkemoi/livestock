@@ -1,112 +1,107 @@
-// src/services/authService.js
-const API_BASE_URL = 'http://localhost:8080/api/auth';
+const USER_KEY = "user";
+const TOKEN_KEY = "token";
 
-class AuthService {
-  async register(userData) {
+const BASE_URL = "http://localhost:8080/api/auth";
+
+const authService = {
+  login: async ({ username, email, password }) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData),
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Registration failed');
-
-      if (data.success && data.data) {
-        this._storeUserSession(data.data);
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Registration error:', error);
-      throw error;
-    }
-  }
-
-  async login(credentials) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(credentials),
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Login failed');
-
-      if (data.data) {
-        this._storeUserSession(data.data);
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    }
-  }
-
-  _storeUserSession(data) {
-    // Save access/refresh tokens and user metadata
-    localStorage.setItem('authToken', data.accessToken);
-    localStorage.setItem('refreshToken', data.refreshToken);
-    localStorage.setItem('userData', JSON.stringify(data));
-  }
-
-  async getCurrentUser() {
-    try {
-      const token = this.getToken();
-      if (!token) throw new Error('No authentication token found');
-
-      const cached = this.getStoredUserData();
-      if (cached) return { data: cached };
-
-      const response = await fetch(`${API_BASE_URL}/me`, {
-        method: 'GET',
+      const response = await fetch(`${BASE_URL}/login`, {
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json"
         },
+        body: JSON.stringify({ username, email, password })
       });
 
-      if (!response.ok) throw new Error('Unauthorized or failed to fetch user');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Login failed");
+      }
 
       const data = await response.json();
-      if (data?.data) {
-        localStorage.setItem('userData', JSON.stringify(data.data));
-        return { data: data.data };
+
+      // Store token immediately if available
+      const token = data?.data?.accessToken || data?.accessToken;
+      if (token) {
+        localStorage.setItem(TOKEN_KEY, token);
       }
 
       return data;
-    } catch (error) {
-      console.error('getCurrentUser error:', error);
-      throw error;
-    }
-  }
-
-  logout() {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('userData');
-  }
-
-  getToken() {
-    return localStorage.getItem('authToken');
-  }
-
-  isAuthenticated() {
-    return !!this.getToken();
-  }
-
-  getStoredUserData() {
-    try {
-      const userData = localStorage.getItem('userData');
-      return userData ? JSON.parse(userData) : null;
     } catch (err) {
-      console.error('Error parsing userData from localStorage:', err);
+      console.error("Login error:", err);
+      throw err;
+    }
+  },
+
+  _storeUserSession: (userData) => {
+    try {
+      // Store user data
+      localStorage.setItem(USER_KEY, JSON.stringify(userData));
+
+      // Store token separately for easier access
+      const token = userData?.accessToken || userData?.data?.accessToken;
+      if (token) {
+        localStorage.setItem(TOKEN_KEY, token);
+      }
+    } catch (err) {
+      console.error("Failed to store user session", err);
+    }
+  },
+
+  getStoredUserData: () => {
+    try {
+      const raw = localStorage.getItem(USER_KEY);
+      if (!raw) return null;
+
+      const user = JSON.parse(raw);
+      if (typeof user !== "object") {
+        authService.logout();
+        return null;
+      }
+
+      // Validate that we have a token
+      const token = authService.getToken();
+      if (!token) {
+        authService.logout();
+        return null;
+      }
+
+      return user;
+    } catch (err) {
+      console.error("Error parsing stored user:", err);
+      authService.logout();
       return null;
     }
-  }
-}
+  },
 
-export default new AuthService();
+  getToken: () => {
+    try {
+      return localStorage.getItem(TOKEN_KEY);
+    } catch (err) {
+      console.error("Error getting token:", err);
+      return null;
+    }
+  },
+
+  isAuthenticated: () => {
+    const token = authService.getToken();
+    return !!token;
+  },
+
+  getRole: () => {
+    const user = authService.getStoredUserData();
+    return user?.role || user?.user?.role || null;
+  },
+
+  logout: () => {
+    try {
+      localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(TOKEN_KEY);
+    } catch (err) {
+      console.error("Failed to clear localStorage on logout", err);
+    }
+  }
+};
+
+export default authService;

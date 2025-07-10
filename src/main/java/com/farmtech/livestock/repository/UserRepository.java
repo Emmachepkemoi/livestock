@@ -1,49 +1,39 @@
 package com.farmtech.livestock.repository;
 
 import com.farmtech.livestock.model.User;
+import com.farmtech.livestock.model.UserRole;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    /**
-     * Find user by username
-     */
     Optional<User> findByUsername(String username);
 
-    /**
-     * Find user by email
-     */
     Optional<User> findByEmail(String email);
 
-    /**
-     * Check if username exists
-     */
     boolean existsByUsername(String username);
 
-    /**
-     * Check if email exists
-     */
     boolean existsByEmail(String email);
 
-    /**
-     * Find active users only (for soft delete)
-     */
     @Query("SELECT u FROM User u WHERE u.active = true AND u.username = :username")
     Optional<User> findActiveByUsername(@Param("username") String username);
 
-    /**
-     * Find user by username and active status
-     */
     Optional<User> findByUsernameAndActive(String username, boolean active);
 
-    /**
-     * Find user by email and active status
-     */
     Optional<User> findByEmailAndActive(String email, boolean active);
+
+    // ✅ New Queries for Role
+
+    @Query("SELECT u FROM User u WHERE u.role.roleName = :roleName AND u.active = true")
+    List<User> findAllByRoleName(@Param("roleName") UserRole.RoleName roleName);
+
+    @Query("SELECT u FROM User u WHERE u.username = :username AND u.role.roleName = :roleName AND u.active = true")
+    Optional<User> findByUsernameAndRole(@Param("username") String username, @Param("roleName") UserRole.RoleName roleName);
 }

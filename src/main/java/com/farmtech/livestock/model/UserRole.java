@@ -1,13 +1,12 @@
 package com.farmtech.livestock.model;
 
-// src/main/java/com/livestock/model/UserRole.java
-
-
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "user_roles")
@@ -15,6 +14,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserRole {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "role_id")
@@ -36,6 +36,17 @@ public class UserRole {
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+    }
+
+    // ✅ Optional: one role to many users
+    @OneToMany(mappedBy = "role", fetch = FetchType.LAZY)
+    private List<User> users;
+
+    public void setDescription(String descriptionForRole) {
+    }
+
+    public void setUpdatedAt(LocalDateTime now) {
+
     }
 
     public enum RoleName {

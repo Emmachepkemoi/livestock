@@ -1,5 +1,7 @@
 package com.farmtech.livestock.dto;
 
+import com.farmtech.livestock.model.UserRole;
+
 public class RegisterRequest {
     private String username;
     private String email;
@@ -7,20 +9,21 @@ public class RegisterRequest {
     private String firstName;
     private String lastName;
     private String phoneNumber;
+    private UserRole.RoleName role;
 
-    // Constructors
     public RegisterRequest() {}
 
-    public RegisterRequest(String username, String email, String password, String firstName, String lastName, String phoneNumber) {
+    public RegisterRequest(String username, String email, String password, String firstName, String lastName, String phoneNumber, UserRole.RoleName role) {
         this.username = username;
         this.email = email;
         this.password = password;
         this.firstName = firstName;
         this.lastName = lastName;
         this.phoneNumber = phoneNumber;
+        this.role = role;
     }
 
-    // Getters and setters
+    // Getters and Setters
     public String getUsername() {
         return username;
     }
@@ -67,5 +70,13 @@ public class RegisterRequest {
 
     public void setPhoneNumber(String phoneNumber) {
         this.phoneNumber = phoneNumber;
+    }
+
+    public UserRole.RoleName getRole() {
+        return role;
+    }
+
+    public void setRole(UserRole.RoleName role) {
+        this.role = role;
     }
 }
