@@ -1,20 +1,27 @@
 package com.farmtech.livestock.service;
 
+import com.farmtech.livestock.dto.AuthResponse;
 import com.farmtech.livestock.dto.LoginRequest;
 import com.farmtech.livestock.dto.RegisterRequest;
-import com.farmtech.livestock.dto.AuthResponse;
+import com.farmtech.livestock.model.FarmerProfile;
 import com.farmtech.livestock.model.User;
 import com.farmtech.livestock.model.UserRole;
+import com.farmtech.livestock.repository.FarmerProfileRepository;
+
 import com.farmtech.livestock.repository.UserRepository;
 import com.farmtech.livestock.repository.UserRoleRepository;
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.crypto.SecretKey;
 import java.time.LocalDateTime;
-import java.util.Date;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Transactional
@@ -27,7 +34,23 @@ public class AuthService {
     private UserRoleRepository roleRepository;
 
     @Autowired
+    private FarmerProfileRepository farmerProfileRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
+
+    // JWT Configuration
+    @Value("${jwt.secret:farmtech-livestock-secret-key-that-should-be-at-least-32-characters-long}")
+    private String jwtSecret;
+
+    @Value("${jwt.expiration:86400}") // 24 hours
+    private Long jwtExpirationTime;
+
+    @Value("${jwt.refresh.expiration:604800}") // 7 days
+    private Long refreshTokenExpirationTime;
+
+    // In-memory refresh token store
+    private final Set<String> validRefreshTokens = ConcurrentHashMap.newKeySet();
 
     public AuthResponse register(RegisterRequest registerRequest) {
         validateRegisterRequest(registerRequest);
@@ -41,13 +64,7 @@ public class AuthService {
         }
 
         try {
-            UserRole.RoleName roleEnum;
-            try {
-                roleEnum = registerRequest.getRole();
-            } catch (IllegalArgumentException e) {
-                throw new RuntimeException("Invalid role: " + registerRequest.getRole());
-            }
-
+            UserRole.RoleName roleEnum = registerRequest.getRole();
             UserRole role = roleRepository.findByRoleName(roleEnum)
                     .orElseThrow(() -> new RuntimeException("Role not found in database: " + roleEnum));
 
@@ -64,6 +81,13 @@ public class AuthService {
             user.setUpdatedAt(LocalDateTime.now());
 
             User savedUser = userRepository.save(user);
+
+            // ✅ Create farmer profile if role is FARMER
+            if (roleEnum == UserRole.RoleName.FARMER) {
+                FarmerProfile farmerProfile = new FarmerProfile();
+                farmerProfile.setUser(savedUser);
+                farmerProfileRepository.save(farmerProfile);
+            }
 
             return createAuthResponse(savedUser);
 
@@ -111,12 +135,24 @@ public class AuthService {
         }
     }
 
+    public Long getUserIdByEmail(String email) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new RuntimeException("Email is required");
+        }
+
+        return userRepository.findByEmailAndActive(email.trim().toLowerCase(), true)
+                .map(User::getId)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+    }
+
+
     public void logout(String refreshToken) {
         if (refreshToken == null || refreshToken.trim().isEmpty()) {
             throw new RuntimeException("Invalid refresh token");
         }
-        System.out.println("Logout called for token: " + refreshToken);
-        // TODO: Implement token invalidation
+
+        validRefreshTokens.remove(refreshToken);
+        System.out.println("Logout successful for token: " + refreshToken);
     }
 
     public AuthResponse refreshToken(String refreshToken) {
@@ -124,14 +160,115 @@ public class AuthService {
             throw new RuntimeException("Invalid refresh token");
         }
 
-        AuthResponse response = new AuthResponse();
-        response.setAccessToken("newAccessToken_" + System.currentTimeMillis());
-        response.setRefreshToken("newRefreshToken_" + System.currentTimeMillis());
-        return response;
+        try {
+            Claims claims = validateJwtToken(refreshToken);
+
+            if (!validRefreshTokens.contains(refreshToken)) {
+                throw new RuntimeException("Refresh token not found or expired");
+            }
+
+            Long userId = claims.get("userId", Long.class);
+
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (!user.getActive()) {
+                throw new RuntimeException("User account is inactive");
+            }
+
+            validRefreshTokens.remove(refreshToken);
+
+            return createAuthResponse(user);
+
+        } catch (Exception e) {
+            System.err.println("Refresh token error: " + e.getMessage());
+            throw new RuntimeException("Invalid refresh token");
+        }
     }
 
     public long getUserCount() {
         return userRepository.count();
+    }
+
+    // ===================== JWT Methods =====================
+
+    private String generateAccessToken(User user) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + jwtExpirationTime * 1000);
+
+        return Jwts.builder()
+                .setSubject(user.getEmail())
+                .setIssuedAt(now)
+                .setExpiration(expiryDate)
+                .claim("userId", user.getId())
+                .claim("username", user.getUsername())
+                .claim("email", user.getEmail())
+                .claim("role", user.getRole().getRoleName().name())
+                .claim("tokenType", "access")
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    private String generateRefreshToken(User user) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + refreshTokenExpirationTime * 1000);
+
+        String refreshToken = Jwts.builder()
+                .setSubject(user.getEmail())
+                .setIssuedAt(now)
+                .setExpiration(expiryDate)
+                .claim("userId", user.getId())
+                .claim("tokenType", "refresh")
+                .signWith(getSigningKey())
+                .compact();
+
+        validRefreshTokens.add(refreshToken);
+
+        return refreshToken;
+    }
+
+    private SecretKey getSigningKey() {
+        byte[] keyBytes = jwtSecret.getBytes();
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    public Claims validateJwtToken(String token) {
+        try {
+            return Jwts.parserBuilder()
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+        } catch (ExpiredJwtException e) {
+            throw new RuntimeException("Token has expired");
+        } catch (UnsupportedJwtException e) {
+            throw new RuntimeException("Unsupported JWT token");
+        } catch (MalformedJwtException e) {
+            throw new RuntimeException("Invalid JWT token");
+        } catch (SignatureException e) {
+            throw new RuntimeException("Invalid JWT signature");
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("JWT token compact of handler are invalid");
+        }
+    }
+
+    public boolean isTokenValid(String token) {
+        try {
+            validateJwtToken(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public String extractEmailFromToken(String token) {
+        Claims claims = validateJwtToken(token);
+        return claims.getSubject();
+    }
+
+    public Long extractUserIdFromToken(String token) {
+        Claims claims = validateJwtToken(token);
+        return claims.get("userId", Long.class);
     }
 
     // ===================== Helpers =====================
@@ -156,7 +293,7 @@ public class AuthService {
             throw new RuntimeException("Password must be at least 6 characters long");
         }
 
-        if (request.getRole() == null)  {
+        if (request.getRole() == null) {
             throw new RuntimeException("Role is required");
         }
     }
@@ -167,8 +304,9 @@ public class AuthService {
         response.setUsername(user.getUsername());
         response.setEmail(user.getEmail());
         response.setRole(user.getRole().getRoleName().name());
-        response.setAccessToken("accessToken_" + user.getId() + "_" + System.currentTimeMillis());
-        response.setRefreshToken("refreshToken_" + user.getId() + "_" + System.currentTimeMillis());
+        response.setAccessToken(generateAccessToken(user));
+        response.setRefreshToken(generateRefreshToken(user));
+        response.setTokenType("Bearer");
         return response;
     }
 

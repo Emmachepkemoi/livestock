@@ -8,6 +8,8 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.GrantedAuthority;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.stream.Collectors;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -33,6 +36,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+
         final String authHeader = request.getHeader("Authorization");
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -43,29 +47,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String jwt = authHeader.substring(7);
 
         try {
-            final String username = jwtService.extractUsername(jwt);
+            final String email = jwtService.extractUsername(jwt); // JWT `sub` contains email
 
-            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                var userDetails = userDetailsService.loadUserByUsername(username);
+            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = userDetailsService.loadUserByEmail(email);
 
                 if (jwtService.isTokenValid(jwt, userDetails)) {
-                    var authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, userDetails.getAuthorities());
+                    UsernamePasswordAuthenticationToken authToken =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    userDetails.getAuthorities()  // Make sure these are SimpleGrantedAuthority
+                            );
+
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
+
+                    log.info("User [{}] authenticated with roles: {}", email,
+                            userDetails.getAuthorities()
+                                    .stream()
+                                    .map(GrantedAuthority::getAuthority)
+                                    .collect(Collectors.toList()));
                 }
             }
-
-        } catch (MalformedJwtException e) {
-            log.error("Malformed JWT token: {}", e.getMessage());
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            response.getWriter().write("{\"error\":\"Invalid token format\"}");
-            return;
-
-        } catch (Exception e) {
-            log.error("JWT processing error: {}", e.getMessage());
-            // Proceed with filter chain in case of unexpected error (e.g., logging only)
+        } catch (Exception ex) {
+            log.error("JWT processing failed: {}", ex.getMessage());
         }
 
         filterChain.doFilter(request, response);

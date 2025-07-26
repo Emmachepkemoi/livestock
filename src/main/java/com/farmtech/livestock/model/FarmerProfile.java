@@ -1,5 +1,6 @@
 package com.farmtech.livestock.model;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -62,6 +63,7 @@ public class FarmerProfile {
     private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "farmer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonManagedReference("farmer-livestock") // Prevent circular reference
     private List<Livestock> livestock;
 
     @PrePersist

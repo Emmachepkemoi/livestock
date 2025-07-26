@@ -32,20 +32,21 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints
-                        .requestMatchers(
-                                "/", "/index.html", "/favicon.ico", "/static/**",
-                                "/css/**", "/js/**", "/images/**",
-                                "/api/auth/**", "/api/livestock"
-                        ).permitAll()
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/public/**").permitAll()
 
-                        // Role-based access for livestock API
-                        .requestMatchers("").hasAnyRole("FARMER", "ADMIN")
+                        // ✅ Upload endpoint - match the actual controller path
+//                        http://localhost:8080/api/livestock/with-image
+                        .requestMatchers("/api/livestock/image/upload").hasAnyAuthority("FARMER", "ADMIN")
+                                .requestMatchers("/api/livestock/create").hasAnyAuthority("FARMER", "ADMIN")
 
-                        // All other endpoints require authentication
+                        .requestMatchers("/api/livestock/**").hasAnyAuthority("FARMER", "ADMIN")
+                        .requestMatchers("/api/categories/**").hasAnyAuthority("FARMER", "ADMIN")
+                        .requestMatchers("/api/breeds/**").hasAnyAuthority("FARMER", "ADMIN")
+                        .requestMatchers("/api/livestock/analytics").hasAnyAuthority("FARMER", "ADMIN")
+
                         .anyRequest().authenticated()
                 )
-                // Register JWT filter
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -59,10 +60,11 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:5173"));
+        config.setAllowedOrigins(List.of("http://localhost:5173"));  // adjust if needed
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
+        config.setExposedHeaders(List.of("Authorization"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

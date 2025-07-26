@@ -1,5 +1,6 @@
 package com.farmtech.livestock.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -21,13 +22,13 @@ public class LivestockDto {
     private String gender; // "MALE" or "FEMALE"
     private LocalDate dateOfBirth;
     private Integer estimatedAgeMonths;
-    private Integer age; // For backward compatibility - maps to estimatedAgeMonths
+    private Integer age; // For backward compatibility
     private Double weightKg;
-    private Double weight; // For backward compatibility - maps to weightKg
+    private Double weight; // For backward compatibility
     private String color;
-    private String healthStatus; // "HEALTHY", "SICK", "RECOVERING", "DECEASED"
+    private String healthStatus; // "HEALTHY", "SICK", etc.
     private LocalDate acquisitionDate;
-    private String acquisitionMethod; // "BORN_ON_FARM", "PURCHASED", "GIFT", "INHERITED"
+    private String acquisitionMethod; // "BORN_ON_FARM", etc.
     private Double acquisitionCost;
     private Double currentValue;
     private Integer motherId;
@@ -42,7 +43,10 @@ public class LivestockDto {
     private String notes;
     private String images;
 
-    // Convenience methods for backward compatibility
+    @JsonIgnoreProperties({"livestock"})
+    private FarmerProfileDto farmer;
+
+    // Convenience methods
     public Integer getAge() {
         return this.estimatedAgeMonths;
     }

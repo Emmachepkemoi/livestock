@@ -22,6 +22,7 @@ public class UserController {
     @Autowired
     private UserService userService;
 
+
     @GetMapping("/profile")
     public ResponseEntity<ApiResponse<UserDto>> getUserProfile(Authentication authentication) {
         try {
@@ -41,6 +42,9 @@ public class UserController {
                     .body(new ApiResponse<>(false, "An error occurred while retrieving profile", null));
         }
     }
+
+
+
 
     @PutMapping("/profile")
     public ResponseEntity<ApiResponse<UserDto>> updateProfile(

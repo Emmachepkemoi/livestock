@@ -1,9 +1,13 @@
 package com.farmtech.livestock.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+import lombok.ToString;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -14,6 +18,8 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@ToString(exclude = {"farmer", "mother", "father"}) // Prevent circular toString
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Livestock {
 
     @Id
@@ -23,14 +29,17 @@ public class Livestock {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "farmer_id", nullable = false)
+    @JsonBackReference("farmer-livestock") // Prevent circular reference
     private FarmerProfile farmer;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER) // Changed to EAGER to avoid lazy loading issues
     @JoinColumn(name = "category_id", nullable = false)
+    @JsonIgnoreProperties({"livestock"}) // Ignore back reference
     private LivestockCategory category;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER) // Changed to EAGER to avoid lazy loading issues
     @JoinColumn(name = "breed_id", nullable = false)
+    @JsonIgnoreProperties({"livestock"}) // Ignore back reference
     private LivestockBreed breed;
 
     @Column(name = "tag_number", nullable = false, length = 50)
@@ -74,10 +83,12 @@ public class Livestock {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "mother_id")
+    @JsonIgnoreProperties({"farmer", "mother", "father", "category", "breed"}) // Prevent deep nesting
     private Livestock mother;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "father_id")
+    @JsonIgnoreProperties({"farmer", "mother", "father", "category", "breed"}) // Prevent deep nesting
     private Livestock father;
 
     @Column(name = "location_on_farm", length = 100)
