@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
 
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 // Lucide icons
 import {
     Users,
@@ -33,7 +34,11 @@ import {
     Phone,
     MoreVertical,
     PieChart as PieChartIcon,
-    LineChart as LineChartIcon
+    LineChart as LineChartIcon,
+    Heart,
+    Target,
+    Globe,
+    Info
 } from 'lucide-react';
 
 // Recharts components
@@ -58,6 +63,7 @@ const AdminDashboard = () => {
     const [selectedFilter, setSelectedFilter] = useState('all');
     const [showModal, setShowModal] = useState(false);
     const [modalType, setModalType] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
     // Mock data - replace with actual API calls
     const [dashboardStats, setDashboardStats] = useState({
@@ -68,7 +74,8 @@ const AdminDashboard = () => {
         newRegistrations: 12,
         activeAppointments: 34,
         completedVisits: 156,
-        pendingApprovals: 8
+        pendingApprovals: 8,
+        totalBreeds: 45 // Added for breed management
     });
 
     const [farmers, setFarmers] = useState([
@@ -158,6 +165,231 @@ const AdminDashboard = () => {
         }
     ]);
 
+    // FIX: Add the missing categories state
+    const [categories, setCategories] = useState([]);
+    const [breeds, setBreeds] = useState([]); // NEW: State for breeds
+
+    const [categoryForm, setCategoryForm] = useState({
+        name: '',
+        description: '',
+        icon: '',
+        color: '#3B82F6', // Default color
+        isActive: true,
+        sortOrder: 0
+    });
+
+    const handleCategoryFormChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        setCategoryForm(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value
+        }));
+    };
+
+    const handleCategorySubmit = async (e) => {
+        e.preventDefault();
+        setIsLoading(true);
+
+        const token = localStorage.getItem('token');
+
+        try {
+            const response = await fetch('http://localhost:8080/api/categories', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(categoryForm)
+            });
+
+            if (response.ok) {
+                const newCategory = await response.json();
+                setCategories(prev => [...prev, newCategory]);
+                // Reset form
+                setCategoryForm({
+                    name: '',
+                    description: '',
+                    icon: '',
+                    color: '#3B82F6',
+                    isActive: true,
+                    sortOrder: 0
+                });
+                setShowModal(false);
+                alert('Category added successfully!');
+            } else {
+                throw new Error('Failed to add category');
+            }
+        } catch (error) {
+            console.error('Error adding category:', error);
+            alert('Failed to add category. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    useEffect(() => {
+        const fetchBreeds = async () => {
+            const token = localStorage.getItem('token');
+
+            try {
+                const response = await fetch('http://localhost:8080/api/breeds', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                    }
+                });
+
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log("Fetched breeds:", data); // 👈 check this
+                    setBreeds(data.data); // assuming your ApiResponse wraps in `.data`
+                } else {
+                    console.error("Error fetching breeds:", response.status);
+                }
+            } catch (error) {
+                console.error("Error fetching breeds:", error);
+            }
+        };
+        fetchBreeds();
+    }, []); // Empty dependency array means this runs once on component mount
+
+
+
+
+    // IMPROVED: Enhanced useEffect for fetching categories with better error handling
+    useEffect(() => {
+        const fetchCategories = async () => {
+            const token = localStorage.getItem('token');
+
+            // Check if token exists
+            if (!token) {
+                console.error('No authentication token found');
+                return;
+            }
+
+            try {
+                setIsLoading(true);
+                const response = await fetch('http://localhost:8080/api/categories', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Categories fetched successfully:', data);
+                    setCategories(data);
+
+                    // Update dashboard stats with actual category count
+                    setDashboardStats(prev => ({
+                        ...prev,
+                        totalBreeds: data.length
+                    }));
+                } else {
+                    // Handle different HTTP error codes
+                    if (response.status === 401) {
+                        console.error('Authentication failed. Please log in again.');
+                        // Optionally redirect to login page
+                    } else if (response.status === 403) {
+                        console.error('Access forbidden. You do not have permission to view categories.');
+                    } else {
+                        console.error('Failed to fetch categories:', response.status, response.statusText);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching categories:', error);
+                // You might want to show a user-friendly error message here
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchCategories();
+    }, []); // Empty dependency array means this runs once on component mount
+
+    // NEW: Form state for breed addition
+    const [breedForm, setBreedForm] = useState({
+        name: '',
+        categoryName: '',
+        originCountry: '',
+        primaryPurpose: '',
+        averageLifespanYears: '',
+        averageLitterSize: '',
+        averageWeightFemaleKg: '',
+        averageWeightMaleKg: '',
+        gestationPeriodDays: '',
+        maturityAgeMonths: '',
+        characteristics: '',
+        description: '',
+        isActive: true
+    });
+
+    const handleBreedFormChange = (e) => {
+        const { name, value, type, checked } = e.target;
+
+        setBreedForm((prev) => ({
+            ...prev,
+            [name]: type === 'checkbox'
+                ? checked
+                : ['average_lifespan_years', 'average_weight_female_kg', 'average_weight_male_kg', 'gestation_period_days', 'average_litter_size', 'maturity_age_months'].includes(name)
+                    ? parseFloat(value) || null
+                    : value
+        }));
+    };
+
+
+    // NEW: Handle breed form submission
+    const handleBreedSubmit = async (e) => {
+        e.preventDefault();
+        setIsLoading(true);
+
+        const token = localStorage.getItem('token');
+
+        try {
+            const response = await fetch('http://localhost:8080/api/breeds', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(breedForm)
+            });
+
+            if (response.ok) {
+                const newBreed = await response.json();
+                setBreeds(prev => [...prev, newBreed]);
+                // Reset form
+                setBreedForm({
+                    name: '',
+                    categoryName: '',
+                    originCountry: '',
+                    primaryPurpose: '',
+                    averageLifespanYears: '',
+                    averageLitterSize: '',
+                    averageWeightFemaleKg: '',
+                    averageWeightMaleKg: '',
+                    gestationPeriodDays: '',
+                    maturityAgeMonths: '',
+                    characteristics: '',
+                    description: '',
+                    isActive: true
+                });
+
+                setShowModal(false);
+                alert('Breed added successfully!');
+            } else {
+                throw new Error('Failed to add breed');
+            }
+        } catch (error) {
+            console.error('Error adding breed:', error);
+            alert('Failed to add breed. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const [systemMetrics, setSystemMetrics] = useState({
         userGrowth: [
             { month: 'Jan', farmers: 180, vets: 12 },
@@ -182,6 +414,39 @@ const AdminDashboard = () => {
             { month: 'Jun', amount: 125000 }
         ]
     });
+
+    // NEW: Function to refresh categories (useful for manual refresh)
+    const refreshCategories = async () => {
+        const token = localStorage.getItem('token');
+
+        if (!token) {
+            console.error('No authentication token found');
+            return;
+        }
+
+        try {
+            setIsLoading(true);
+            const response = await fetch('http://localhost:8080/api/categories', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setCategories(data);
+                console.log('Categories refreshed successfully');
+            } else {
+                console.error('Failed to refresh categories:', response.status);
+            }
+        } catch (error) {
+            console.error('Error refreshing categories:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const StatCard = ({ title, value, icon: Icon, color, trend, subtitle }) => (
         <div className="bg-white rounded-lg shadow-md p-6 border-l-4" style={{ borderLeftColor: color }}>
@@ -310,12 +575,210 @@ const AdminDashboard = () => {
                 </button>
             </div>
         </div>
+    );const CategoryCard = ({ category, onEdit, onDelete, onView }) => (
+        <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200 hover:shadow-lg transition-shadow">
+            <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center space-x-3">
+                    <div
+                        className="w-12 h-12 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: category.color || '#3B82F6' }}
+                    >
+                        <Building className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-gray-900">{category.name}</h3>
+                        <p className="text-sm text-gray-600">Order: {category.sortOrder}</p>
+                    </div>
+                </div>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    category.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                }`}>
+                {category.isActive ? 'Active' : 'Inactive'}
+            </span>
+            </div>
+
+            <div className="mb-4">
+                <p className="text-sm text-gray-600 line-clamp-2">{category.description}</p>
+            </div>
+
+            <div className="flex space-x-2">
+                <button
+                    onClick={() => onView(category)}
+                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center"
+                >
+                    <Eye className="h-4 w-4 mr-2" />
+                    View
+                </button>
+                <button
+                    onClick={() => onEdit(category)}
+                    className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 transition-colors flex items-center justify-center"
+                >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                </button>
+                <button
+                    onClick={() => onDelete(category)}
+                    className="bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors"
+                >
+                    <Trash2 className="h-4 w-4" />
+                </button>
+            </div>
+        </div>
+    );
+
+    // NEW: Breed Card Component
+    const BreedCard = ({ breed, onEdit, onDelete, onView }) => (
+        <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200 hover:shadow-lg transition-shadow">
+            <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center">
+                        <Heart className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-gray-900">{breed.name}</h3>
+                        <p className="text-sm text-gray-600">{breed.breedId}</p>
+                    </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        breed.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                        {breed.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                    <div className="relative">
+                        <button className="p-1 text-gray-400 hover:text-gray-600">
+                            <MoreVertical className="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                <div>
+                    <p className="text-gray-600">Category</p>
+                    <p className="font-medium">{breed.categoryName}</p>
+                </div>
+                <div>
+                    <p className="text-gray-600">Origin</p>
+                    <p className="font-medium">{breed.originCountry}</p>
+                </div>
+                <div>
+                    <p className="text-gray-600">Primary Purpose</p>
+                    <p className="font-medium">{breed.primaryPurpose}</p>
+                </div>
+                <div>
+                    <p className="text-gray-600">Lifespan</p>
+                    <p className="font-medium">{breed.averageLifespanYears} years</p>
+                </div>
+                <div>
+                    <p className="text-gray-600">Female Weight</p>
+                    <p className="font-medium">{breed.averageWeightFemaleKg} kg</p>
+                </div>
+                <div>
+                    <p className="text-gray-600">Male Weight</p>
+                    <p className="font-medium">{breed.averageWeightMaleKg} kg</p>
+                </div>
+            </div>
+
+            <div className="mb-4">
+                <p className="text-gray-600 text-sm mb-1">Characteristics</p>
+                <p className="text-sm text-gray-800 line-clamp-2">{breed.characteristics}</p>
+            </div>
+
+            <div className="flex space-x-2">
+                <button
+                    onClick={() => onView(breed)}
+                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center"
+                >
+                    <Eye className="h-4 w-4 mr-2" />
+                    View
+                </button>
+                <button
+                    onClick={() => onEdit(breed)}
+                    className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 transition-colors flex items-center justify-center"
+                >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                </button>
+                <button
+                    onClick={() => onDelete(breed)}
+                    className="bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors"
+                >
+                    <Trash2 className="h-4 w-4" />
+                </button>
+            </div>
+        </div>
     );
 
     const handleUserAction = (action, user) => {
         console.log(`${action} user:`, user);
         // Implement actual user management actions
     };
+
+    // NEW: Breed management functions
+    const handleBreedAction = (action, breed) => {
+        console.log(`${action} breed:`, breed);
+        // Implement actual breed management actions
+    };
+
+    // const handleBreedFormChange = (e) => {
+    //     const { name, value, type, checked } = e.target;
+    //     setBreedForm(prev => ({
+    //         ...prev,
+    //         [name]: type === 'checkbox' ? checked : value
+    //     }));
+    // };
+
+    // const handleBreedSubmit = async (e) => {
+    //     e.preventDefault();
+    //     setIsLoading(true);
+    //
+    //     const token = localStorage.getItem('token'); // or sessionStorage.getItem('token')
+    //
+    //     try {
+    //         const response = await fetch('http://localhost:8080/api/breeds', {
+    //             method: 'POST',
+    //             headers: {
+    //                 'Content-Type': 'application/json',
+    //                 'Authorization': `Bearer ${token}`
+    //             },
+    //             body: JSON.stringify(breedForm)
+    //         });
+    //
+    //
+    //         if (response.ok) {
+    //             const newBreed = await response.json();
+    //             // Add the new breed to the local state
+    //             setBreeds(prev => [...prev, newBreed]);
+    //             // Reset form
+    //             setBreedForm({
+    //                 name: '',
+    //                 category_id: '',
+    //                 origin_country: '',
+    //                 primary_purpose: '',
+    //                 average_lifespan_years: '',
+    //                 average_litter_size: '',
+    //                 average_weight_female_kg: '',
+    //                 average_weight_male_kg: '',
+    //                 gestation_period_days: '',
+    //                 maturity_age_months: '',
+    //                 characteristics: '',
+    //                 description: '',
+    //                 is_active: true
+    //             });
+    //             setShowModal(false);
+    //             // Show success message
+    //             alert('Breed added successfully!');
+    //         } else {
+    //             throw new Error('Failed to add breed');
+    //         }
+    //     } catch (error) {
+    //         console.error('Error adding breed:', error);
+    //         alert('Failed to add breed. Please try again.');
+    //     } finally {
+    //         setIsLoading(false);
+    //     }
+    // };
 
     const openModal = (type) => {
         setModalType(type);
@@ -325,6 +788,25 @@ const AdminDashboard = () => {
     const closeModal = () => {
         setShowModal(false);
         setModalType('');
+        // Reset breed form when closing
+        if (modalType === 'add-breed') {
+            setBreedForm({
+                name: '',
+                categoryName: '',
+                originCountry: '',
+                primaryPurpose: '',
+                averageLifespanYears: '',
+                averageLitterSize: '',
+                averageWeightFemaleKg: '',
+                averageWeightMaleKg: '',
+                gestationPeriodDays: '',
+                maturityAgeMonths: '',
+                characteristics: '',
+                description: '',
+                isActive: true
+            });
+        }
+
     };
 
     return (
@@ -335,7 +817,7 @@ const AdminDashboard = () => {
                     <div className="flex justify-between items-center py-6">
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-                            <p className="text-gray-600">Manage users, monitor system performance</p>
+                            <p className="text-gray-600">Manage users, breeds, and monitor system performance</p>
                         </div>
                         <div className="flex items-center space-x-4">
                             <button className="relative p-2 text-gray-600 hover:text-gray-900">
@@ -373,7 +855,7 @@ const AdminDashboard = () => {
                     <StatCard
                         title="Active Animals"
                         value="3,420"
-                        icon={Activity} // ✅ This works as expected
+                        icon={Activity}
                         color="#F59E0B"
                         trend="+8.5% growth"
                     />
@@ -387,7 +869,7 @@ const AdminDashboard = () => {
                 </div>
 
                 {/* Additional Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
                     <StatCard
                         title="New Registrations"
                         value={dashboardStats.newRegistrations}
@@ -416,9 +898,17 @@ const AdminDashboard = () => {
                         color="#F97316"
                         subtitle="Requires action"
                     />
+                    {/* NEW: Total Breeds Stat Card */}
+                    <StatCard
+                        title="Total Breeds"
+                        value={dashboardStats.totalBreeds}
+                        icon={Heart}
+                        color="#EC4899"
+                        subtitle="In database"
+                    />
                 </div>
 
-                {/* Navigation Tabs */}
+                {/* Navigation Tabs - UPDATED to include breeds */}
                 <div className="bg-white rounded-lg shadow-sm mb-6">
                     <div className="border-b border-gray-200">
                         <nav className="flex space-x-8 px-6">
@@ -426,6 +916,8 @@ const AdminDashboard = () => {
                                 { id: 'overview', label: 'Overview', icon: BarChart3 },
                                 { id: 'farmers', label: 'Farmers', icon: Users },
                                 { id: 'veterinarians', label: 'Veterinarians', icon: Stethoscope },
+                                { id: 'breeds', label: 'Breeds', icon: Heart },
+                                {id: 'categories', label: 'categories', icon: Building },// NEW TAB
                                 { id: 'analytics', label: 'Analytics', icon: PieChart },
                                 { id: 'settings', label: 'Settings', icon: Settings }
                             ].map((tab) => (
@@ -501,57 +993,53 @@ const AdminDashboard = () => {
                             </ResponsiveContainer>
                         </div>
 
-                        {/* Revenue Chart */}
+                        {/* Revenue Trend */}
                         <div className="bg-white rounded-lg shadow-md p-6 lg:col-span-2">
-                            <h3 className="text-lg font-semibold mb-4">Revenue Trend (KSh)</h3>
+                            <h3 className="text-lg font-semibold mb-4">Revenue Trend</h3>
                             <ResponsiveContainer width="100%" height={300}>
                                 <BarChart data={systemMetrics.revenue}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="month" />
                                     <YAxis />
                                     <Tooltip formatter={(value) => [`KSh ${value.toLocaleString()}`, 'Revenue']} />
-                                    <Bar dataKey="amount" fill="#8884d8" />
+                                    <Bar dataKey="amount" fill="#3B82F6" />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
                 )}
 
+                {/* Farmers Management */}
                 {activeTab === 'farmers' && (
                     <div className="space-y-6">
                         <div className="bg-white rounded-lg shadow-md p-6">
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-lg font-semibold">Farmer Management</h2>
-                                <div className="flex space-x-3">
-                                    <button
-                                        onClick={() => openModal('add-farmer')}
-                                        className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors flex items-center"
-                                    >
-                                        <Plus className="h-4 w-4 mr-2" />
-                                        Add Farmer
-                                    </button>
-                                    <button className="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors flex items-center">
-                                        <Download className="h-4 w-4 mr-2" />
-                                        Export
-                                    </button>
-                                </div>
+                                <h3 className="text-lg font-semibold">Farmers Management</h3>
+                                <button
+                                    onClick={() => openModal('add-farmer')}
+                                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center"
+                                >
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Farmer
+                                </button>
                             </div>
 
-                            <div className="flex space-x-4 mb-6">
+                            {/* Search and Filter */}
+                            <div className="flex flex-col md:flex-row gap-4 mb-6">
                                 <div className="flex-1 relative">
                                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                                     <input
                                         type="text"
                                         placeholder="Search farmers..."
-                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     />
                                 </div>
                                 <select
-                                    className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     value={selectedFilter}
                                     onChange={(e) => setSelectedFilter(e.target.value)}
+                                    className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 >
                                     <option value="all">All Status</option>
                                     <option value="active">Active</option>
@@ -560,15 +1048,16 @@ const AdminDashboard = () => {
                                 </select>
                             </div>
 
+                            {/* Farmers Grid */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {farmers.map((farmer) => (
                                     <UserCard
                                         key={farmer.id}
                                         user={farmer}
                                         type="farmer"
-                                        onView={(user) => handleUserAction('view', user)}
                                         onEdit={(user) => handleUserAction('edit', user)}
                                         onDelete={(user) => handleUserAction('delete', user)}
+                                        onView={(user) => handleUserAction('view', user)}
                                     />
                                 ))}
                             </div>
@@ -576,41 +1065,37 @@ const AdminDashboard = () => {
                     </div>
                 )}
 
+                {/* Veterinarians Management */}
                 {activeTab === 'veterinarians' && (
                     <div className="space-y-6">
                         <div className="bg-white rounded-lg shadow-md p-6">
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-lg font-semibold">Veterinarian Management</h2>
-                                <div className="flex space-x-3">
-                                    <button
-                                        onClick={() => openModal('add-vet')}
-                                        className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors flex items-center"
-                                    >
-                                        <Plus className="h-4 w-4 mr-2" />
-                                        Add Veterinarian
-                                    </button>
-                                    <button className="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors flex items-center">
-                                        <Download className="h-4 w-4 mr-2" />
-                                        Export
-                                    </button>
-                                </div>
+                                <h3 className="text-lg font-semibold">Veterinarians Management</h3>
+                                <button
+                                    onClick={() => openModal('add-vet')}
+                                    className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center"
+                                >
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Veterinarian
+                                </button>
                             </div>
 
-                            <div className="flex space-x-4 mb-6">
+                            {/* Search and Filter */}
+                            <div className="flex flex-col md:flex-row gap-4 mb-6">
                                 <div className="flex-1 relative">
                                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                                     <input
                                         type="text"
                                         placeholder="Search veterinarians..."
-                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     />
                                 </div>
                                 <select
-                                    className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     value={selectedFilter}
                                     onChange={(e) => setSelectedFilter(e.target.value)}
+                                    className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 >
                                     <option value="all">All Status</option>
                                     <option value="active">Active</option>
@@ -619,15 +1104,16 @@ const AdminDashboard = () => {
                                 </select>
                             </div>
 
+                            {/* Veterinarians Grid */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {veterinarians.map((vet) => (
                                     <UserCard
                                         key={vet.id}
                                         user={vet}
                                         type="vet"
-                                        onView={(user) => handleUserAction('view', user)}
                                         onEdit={(user) => handleUserAction('edit', user)}
                                         onDelete={(user) => handleUserAction('delete', user)}
+                                        onView={(user) => handleUserAction('view', user)}
                                     />
                                 ))}
                             </div>
@@ -635,229 +1121,517 @@ const AdminDashboard = () => {
                     </div>
                 )}
 
-                {activeTab === 'analytics' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* System Performance */}
+                {/* NEW: Breeds Management Tab */}
+                {activeTab === 'breeds' && (
+                    <div className="space-y-6">
                         <div className="bg-white rounded-lg shadow-md p-6">
-                            <h3 className="text-lg font-semibold mb-4">System Performance</h3>
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-600">Server Uptime</span>
-                                    <span className="font-semibold text-green-600">99.8%</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-600">API Response Time</span>
-                                    <span className="font-semibold">245ms</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-600">Active Sessions</span>
-                                    <span className="font-semibold">1,247</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-600">Database Size</span>
-                                    <span className="font-semibold">2.4 GB</span>
-                                </div>
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-lg font-semibold">Breeds Management</h3>
+                                <button
+                                    onClick={() => openModal('add-breed')}
+                                    className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors flex items-center"
+                                >
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Breed
+                                </button>
                             </div>
-                        </div>
 
-                        {/* Top Locations */}
-                        <div className="bg-white rounded-lg shadow-md p-6">
-                            <h3 className="text-lg font-semibold mb-4">Top Locations by Users</h3>
-                            <div className="space-y-3">
-                                {[
-                                    { location: 'Kiambu County', users: 67, percentage: 85 },
-                                    { location: 'Nakuru County', users: 54, percentage: 70 },
-                                    { location: 'Eldoret County', users: 43, percentage: 55 },
-                                    { location: 'Nairobi County', users: 38, percentage: 50 },
-                                    { location: 'Meru County', users: 29, percentage: 35 }
-                                ].map((item, index) => (
-                                    <div key={index} className="space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-sm font-medium">{item.location}</span>
-                                            <span className="text-sm text-gray-600">{item.users} users</span>
-                                        </div>
-                                        <div className="w-full bg-gray-200 rounded-full h-2">
-                                            <div
-                                                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                                                style={{ width: `${item.percentage}%` }}
-                                            ></div>
-                                        </div>
-                                    </div>
+                            {/* Search and Filter */}
+                            <div className="flex flex-col md:flex-row gap-4 mb-6">
+                                <div className="flex-1 relative">
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search breeds..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                                <select
+                                    value={selectedFilter}
+                                    onChange={(e) => setSelectedFilter(e.target.value)}
+                                    className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                    <option value="all">All Categories</option>
+                                    {categories.map((category) => (
+                                        <option key={category.id} value={category.id}>{category.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Breeds Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {breeds.map((breed) => (
+                                    <BreedCard
+                                        key={breed.breed_id}
+                                        breed={breed}
+                                        onEdit={(breed) => handleBreedAction('edit', breed)}
+                                        onDelete={(breed) => handleBreedAction('delete', breed)}
+                                        onView={(breed) => handleBreedAction('view', breed)}
+                                    />
                                 ))}
                             </div>
                         </div>
+                    </div>
+                )}
+                {/* Categories Management Tab */}
+                {activeTab === 'categories' && (
+                    <div className="space-y-6">
+                        <div className="bg-white rounded-lg shadow-md p-6">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-lg font-semibold">Categories Management</h3>
+                                <button
+                                    onClick={() => openModal('add-category')}
+                                    className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors flex items-center"
+                                >
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Category
+                                </button>
+                            </div>
 
-                        {/* Recent Activities */}
-                        <div className="bg-white rounded-lg shadow-md p-6 lg:col-span-2">
-                            <h3 className="text-lg font-semibold mb-4">Recent System Activities</h3>
-                            <div className="space-y-4">
-                                {[
-                                    { action: 'New farmer registration', user: 'John Smith', time: '2 minutes ago', type: 'success' },
-                                    { action: 'Veterinarian profile updated', user: 'Dr. Mary Johnson', time: '15 minutes ago', type: 'info' },
-                                    { action: 'Payment processed', user: 'Peter Kamau', time: '1 hour ago', type: 'success' },
-                                    { action: 'System backup completed', user: 'System', time: '2 hours ago', type: 'info' },
-                                    { action: 'Failed login attempt', user: 'Unknown', time: '3 hours ago', type: 'warning' }
-                                ].map((activity, index) => (
-                                    <div key={index} className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
-                                        <div className={`w-3 h-3 rounded-full ${
-                                            activity.type === 'success' ? 'bg-green-500' :
-                                                activity.type === 'info' ? 'bg-blue-500' :
-                                                    'bg-yellow-500'
-                                        }`}></div>
-                                        <div className="flex-1">
-                                            <p className="font-medium">{activity.action}</p>
-                                            <p className="text-sm text-gray-600">{activity.user} • {activity.time}</p>
-                                        </div>
-                                        <button className="text-gray-400 hover:text-gray-600">
-                                            <MoreVertical className="h-4 w-4" />
-                                        </button>
-                                    </div>
+                            {/* Categories Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {categories.map((category) => (
+                                    <CategoryCard
+                                        key={category.id}
+                                        category={category}
+                                        onEdit={(cat) => handleCategoryAction('edit', cat)}
+                                        onDelete={(cat) => handleCategoryAction('delete', cat)}
+                                        onView={(cat) => handleCategoryAction('view', cat)}
+                                    />
                                 ))}
                             </div>
                         </div>
                     </div>
                 )}
 
+
+                {/* Analytics Tab */}
+                {activeTab === 'analytics' && (
+                    <div className="space-y-6">
+                        <div className="bg-white rounded-lg shadow-md p-6">
+                            <h3 className="text-lg font-semibold mb-4">System Analytics</h3>
+                            <p className="text-gray-600">Advanced analytics and reporting features coming soon...</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Settings Tab */}
                 {activeTab === 'settings' && (
-                    <div className="bg-white rounded-lg shadow-md p-6">
-                        <h2 className="text-lg font-semibold mb-6">System Settings</h2>
-
-                        <div className="space-y-6">
-                            {/* Notification Settings */}
-                            <div className="border-b pb-6">
-                                <h3 className="font-medium mb-4 flex items-center">
-                                    <Bell className="h-5 w-5 mr-2 text-gray-600" />
-                                    Notification Settings
-                                </h3>
-                                <div className="space-y-4">
-                                    {[
-                                        { name: 'email', label: 'Email Notifications', description: 'Receive system notifications via email' },
-                                        { name: 'sms', label: 'SMS Alerts', description: 'Get important alerts via text message' },
-                                        { name: 'push', label: 'Push Notifications', description: 'Enable in-app notifications' }
-                                    ].map((setting) => (
-                                        <div key={setting.name} className="flex justify-between items-center">
-                                            <div>
-                                                <p className="font-medium">{setting.label}</p>
-                                                <p className="text-sm text-gray-600">{setting.description}</p>
-                                            </div>
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input type="checkbox" className="sr-only peer" defaultChecked />
-                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                                            </label>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* System Preferences */}
-                            <div className="border-b pb-6">
-                                <h3 className="font-medium mb-4 flex items-center">
-                                    <Settings className="h-5 w-5 mr-2 text-gray-600" />
-                                    System Preferences
-                                </h3>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Default Timezone</label>
-                                        <select className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                            <option>Africa/Nairobi (EAT)</option>
-                                            <option>UTC</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Date Format</label>
-                                        <select className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                            <option>DD/MM/YYYY</option>
-                                            <option>MM/DD/YYYY</option>
-                                            <option>YYYY-MM-DD</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Backup & Restore */}
-                            <div>
-                                <h3 className="font-medium mb-4 flex items-center">
-                                    <Shield className="h-5 w-5 mr-2 text-gray-600" />
-                                    Backup & Restore
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <button className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center">
-                                        <Download className="h-4 w-4 mr-2" />
-                                        Backup Now
-                                    </button>
-                                    <button className="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 transition-colors flex items-center justify-center">
-                                        <Upload className="h-4 w-4 mr-2" />
-                                        Restore
-                                    </button>
-                                    <button className="bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors flex items-center justify-center">
-                                        <Trash2 className="h-4 w-4 mr-2" />
-                                        Clear Cache
-                                    </button>
-                                </div>
-                            </div>
+                    <div className="space-y-6">
+                        <div className="bg-white rounded-lg shadow-md p-6">
+                            <h3 className="text-lg font-semibold mb-4">System Settings</h3>
+                            <p className="text-gray-600">Configuration and system settings coming soon...</p>
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* Modals */}
-            {showModal && (
+
+
+
+            {/*add breed form modal*/}
+            {showModal && modalType === 'add-breed' && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-                        <div className="p-6">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-lg font-semibold">
-                                    {modalType === 'add-farmer' ? 'Add New Farmer' : 'Add New Veterinarian'}
-                                </h3>
-                                <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <form onSubmit={handleBreedSubmit} className="p-6">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-lg font-semibold">Add New Breed</h3>
+                                <button
+                                    type="button"
+                                    onClick={closeModal}
+                                    className="text-gray-400 hover:text-gray-600"
+                                >
                                     <XCircle className="h-6 w-6" />
                                 </button>
                             </div>
 
-                            <form className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                                    <input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                                    <input type="email" className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                                    <input type="tel" className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                                </div>
-
-                                {modalType === 'add-vet' && (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Breed Name */}
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Specialization</label>
-                                        <select className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                            <option>Large Animals</option>
-                                            <option>Poultry</option>
-                                            <option>Small Animals</option>
-                                            <option>Mixed Practice</option>
-                                        </select>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Breed Name *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="name"
+                                            value={breedForm.name}
+                                            onChange={handleBreedFormChange}
+                                            required
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        />
                                     </div>
-                                )}
 
+                                    {/* Category */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Category *
+                                        </label>
+                                        <select
+                                            name="categoryName"
+                                            value={breedForm.categoryName }
+                                            onChange={handleBreedFormChange}
+                                            required
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        >
+                                            <option value="">Select Category</option>
+                                            {categories.map((category) => (
+                                                <option key={category.name} value={category.name}>
+                                                    {category.name}
+                                                </option>
+                                            ))}
+                                        </select>
+
+                                    </div>
+
+                                    {/* Origin Country */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Origin Country *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="originCountry"
+                                            value={breedForm.originCountry}
+                                            onChange={handleBreedFormChange}
+                                            required
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                    </div>
+
+                                    {/* Primary Purpose */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Primary Purpose *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="primaryPurpose"
+                                            value={breedForm.primaryPurpose}
+                                            onChange={handleBreedFormChange}
+                                            required
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                    </div>
+
+                                    {/* Lifespan */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Average Lifespan (Years) *
+                                        </label>
+                                        <input
+                                            type="number"
+                                            name="averageLifespanYears"
+                                            value={breedForm.averageLifespanYears}
+                                            onChange={handleBreedFormChange}
+                                            required
+                                            min="1"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                    </div>
+
+                                    {/* Litter Size */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Average Litter Size
+                                        </label>
+                                        <input
+                                            type="number"
+                                            name="averageLitterSize"
+                                            value={breedForm.averageLitterSize}
+                                            onChange={handleBreedFormChange}
+                                            min="1"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                    </div>
+
+                                    {/* Female Weight */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Female Weight (kg) *
+                                        </label>
+                                        <input
+                                            type="number"
+                                            name="averageWeightFemaleKg"
+                                            value={breedForm.averageWeightFemaleKg}
+                                            onChange={handleBreedFormChange}
+                                            required
+                                            min="0"
+                                            step="0.1"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                    </div>
+
+                                    {/* Male Weight */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Male Weight (kg) *
+                                        </label>
+                                        <input
+                                            type="number"
+                                            name="averageWeightMaleKg"
+                                            value={breedForm.averageWeightMaleKg}
+                                            onChange={handleBreedFormChange}
+                                            required
+                                            min="0"
+                                            step="0.1"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                    </div>
+
+                                    {/* Gestation Period */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Gestation Period (Days)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            name="gestationPeriodDays"
+                                            value={breedForm.gestationPeriodDays}
+                                            onChange={handleBreedFormChange}
+                                            min="1"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                    </div>
+
+                                    {/* Maturity Age */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Maturity Age (Months)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            name="maturityAgeMonths"
+                                            value={breedForm.maturityAgeMonths}
+                                            onChange={handleBreedFormChange}
+                                            min="1"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Characteristics */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Characteristics *
+                                    </label>
+                                    <textarea
+                                        name="characteristics"
+                                        value={breedForm.characteristics}
+                                        onChange={handleBreedFormChange}
+                                        required
+                                        rows={3}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+
+                                {/* Description */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Description
+                                    </label>
+                                    <textarea
+                                        name="description"
+                                        value={breedForm.description}
+                                        onChange={handleBreedFormChange}
+                                        rows={3}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+
+                                {/* Is Active */}
+                                <div className="flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        name="isActive"
+                                        checked={breedForm.isActive}
+                                        onChange={handleBreedFormChange}
+                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                    />
+                                    <label className="ml-2 block text-sm text-gray-700">
+                                        Active
+                                    </label>
+                                </div>
+
+                                {/* Submit */}
                                 <div className="flex justify-end space-x-3 pt-4">
                                     <button
                                         type="button"
                                         onClick={closeModal}
-                                        className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                                        className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
                                     >
                                         Cancel
                                     </button>
                                     <button
                                         type="submit"
-                                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                        disabled={isLoading}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
                                     >
-                                        Save {modalType === 'add-farmer' ? 'Farmer' : 'Veterinarian'}
+                                        {isLoading ? 'Adding...' : 'Add Breed'}
                                     </button>
                                 </div>
-                            </form>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Add Category Modal */}
+            {showModal && modalType === 'add-category' && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+                        <div className="p-6">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-lg font-semibold">Add New Category</h3>
+                                <button
+                                    onClick={closeModal}
+                                    className="text-gray-400 hover:text-gray-600"
+                                >
+                                    <XCircle className="h-6 w-6" />
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Category Name *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="name"
+                                        value={categoryForm.name}
+                                        onChange={handleCategoryFormChange}
+                                        required
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Description
+                                    </label>
+                                    <textarea
+                                        name="description"
+                                        value={categoryForm.description}
+                                        onChange={handleCategoryFormChange}
+                                        rows={3}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Icon
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="icon"
+                                        value={categoryForm.icon}
+                                        onChange={handleCategoryFormChange}
+                                        placeholder="e.g., cattle, poultry, goat"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Color
+                                    </label>
+                                    <input
+                                        type="color"
+                                        name="color"
+                                        value={categoryForm.color}
+                                        onChange={handleCategoryFormChange}
+                                        className="w-full h-10 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Sort Order
+                                    </label>
+                                    <input
+                                        type="number"
+                                        name="sortOrder"
+                                        value={categoryForm.sortOrder}
+                                        onChange={handleCategoryFormChange}
+                                        min="0"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+
+                                <div className="flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        name="isActive"
+                                        checked={categoryForm.isActive}
+                                        onChange={handleCategoryFormChange}
+                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                    />
+                                    <label className="ml-2 block text-sm text-gray-700">
+                                        Active
+                                    </label>
+                                </div>
+
+                                <div className="flex justify-end space-x-3 pt-4">
+                                    <button
+                                        type="button"
+                                        onClick={closeModal}
+                                        className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleCategorySubmit}
+                                        disabled={isLoading}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+                                    >
+                                        {isLoading ? 'Adding...' : 'Add Category'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Other Modals (Add Farmer, Add Vet, etc.) */}
+            {showModal && modalType === 'add-farmer' && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+                        <div className="p-6">
+                            <h3 className="text-lg font-semibold mb-4">Add New Farmer</h3>
+                            <p className="text-gray-600">Farmer registration form coming soon...</p>
+                            <div className="flex justify-end space-x-3 pt-4">
+                                <button
+                                    onClick={closeModal}
+                                    className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showModal && modalType === 'add-vet' && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+                        <div className="p-6">
+                            <h3 className="text-lg font-semibold mb-4">Add New Veterinarian</h3>
+                            <p className="text-gray-600">Veterinarian registration form coming soon...</p>
+                            <div className="flex justify-end space-x-3 pt-4">
+                                <button
+                                    onClick={closeModal}
+                                    className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+                                >
+                                    Close
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

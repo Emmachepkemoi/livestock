@@ -1,6 +1,9 @@
-// src/components/dashboard/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
-import { User, LogOut, BarChart3, Users, Calendar, Bell, Settings, Shield, Eye, EyeOff, Plus, TrendingUp, Activity, PieChart, Filter, Search, X } from 'lucide-react';
+import {
+  User, LogOut, BarChart3, Users, Calendar, Bell,
+  Settings, Shield, Eye, EyeOff, Plus, TrendingUp,
+  Activity, PieChart, Filter, Search, X
+} from 'lucide-react';
 import AddAnimalModal from '../components/AddAnimalModal.jsx';
 
 function Dashboard({ user, onLogout }) {
@@ -12,6 +15,31 @@ function Dashboard({ user, onLogout }) {
     feedingReminders: true
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [showAddAnimalModal, setShowAddAnimalModal] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+
+  // Loading states
+  const [loading, setLoading] = useState({
+    categories: false,
+    breeds: false,
+    animals: false,
+    analytics: false
+  });
+
+  // Error states
+  const [error, setError] = useState({
+    categories: null,
+    breeds: null,
+    animals: null,
+    analytics: null
+  });
+
   const [livestockData, setLivestockData] = useState({
     animals: [],
     categories: [],
@@ -25,135 +53,362 @@ function Dashboard({ user, onLogout }) {
       recentActivities: []
     }
   });
-  const [showAddAnimalModal, setShowAddAnimalModal] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  });
 
-  // Add null check for user
-  if (!user) {
-    return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading user data...</p>
-          </div>
-        </div>
-    );
-  }
+  // API configuration
+  const API_BASE_URL = 'http://localhost:8080/api';
+  const RETRY_ATTEMPTS = 3;
+  const RETRY_DELAY = 1000; // 1 second
 
-  // Fetch livestock data
   useEffect(() => {
-    fetchLivestockData();
+    initializeData();
   }, []);
 
-  const fetchLivestockData = async () => {
-    try {
-      // Replace with your actual API endpoints
-      const [animalsRes, categoriesRes, breedsRes, analyticsRes] = await Promise.all([
-        fetch('http://localhost:8080/api/livestock/animals', {
-          headers: { 'Authorization': `Bearer ${user.accessToken}` }
-        }),
-        fetch('http://localhost:8080/api/livestock/categories'),
-        fetch('http://localhost:8080/api/livestock/breeds'),
-        fetch('http://localhost:8080/api/livestock/analytics', {
-          headers: { 'Authorization': `Bearer ${user.accessToken}` }
-        })
-      ]);
+  // Initialize all data on component mount
+  const initializeData = async () => {
+    await Promise.all([
+      fetchCategories(),
+      fetchBreeds(),
+      fetchLivestockData()
+    ]);
+  };
 
-      const animals = await animalsRes.json();
-      const categories = await categoriesRes.json();
-      const breeds = await breedsRes.json();
-      const analytics = await analyticsRes.json();
+  // Get authentication headers
+  const getAuthHeaders = () => {
+    const token = user?.accessToken || localStorage.getItem('token');
+    return {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` })
+    };
+  };
 
-      setLivestockData({
-        animals: animals.data || [],
-        categories: categories.data || [],
-        breeds: breeds.data || [],
-        analytics: analytics.data || {
-          totalAnimals: 0,
-          totalValue: 0,
-          healthyAnimals: 0,
-          sickAnimals: 0,
-          categoryBreakdown: [],
-          recentActivities: []
+  // Retry utility function
+  const withRetry = async (apiCall, retries = RETRY_ATTEMPTS) => {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        return await apiCall();
+      } catch (error) {
+        console.warn(`API call attempt ${attempt} failed:`, error.message);
+
+        if (attempt === retries) {
+          throw error; // Re-throw on final attempt
         }
-      });
-    } catch (error) {
-      console.error('Error fetching livestock data:', error);
-      // Mock data for demonstration
-      setLivestockData({
-        animals: [
-          {
-            livestockId: 1,
-            tagNumber: 'COW001',
-            name: 'Bessie',
-            category: { name: 'Cattle' },
-            breed: { name: 'Holstein' },
-            gender: 'FEMALE',
-            healthStatus: 'HEALTHY',
-            weightKg: 450,
-            currentValue: 1200,
-            acquisitionDate: '2023-01-15'
-          },
-          {
-            livestockId: 2,
-            tagNumber: 'PIG001',
-            name: 'Porky',
-            category: { name: 'Pigs' },
-            breed: { name: 'Yorkshire' },
-            gender: 'MALE',
-            healthStatus: 'HEALTHY',
-            weightKg: 180,
-            currentValue: 800,
-            acquisitionDate: '2023-03-10'
-          }
-        ],
-        categories: [
-          { categoryId: 1, name: 'Cattle', color: '#3B82F6' },
-          { categoryId: 2, name: 'Pigs', color: '#EF4444' },
-          { categoryId: 3, name: 'Sheep', color: '#10B981' },
-          { categoryId: 4, name: 'Chickens', color: '#F59E0B' }
-        ],
-        breeds: [
-          { breedId: 1, name: 'Holstein', categoryId: 1 },
-          { breedId: 2, name: 'Yorkshire', categoryId: 2 },
-          { breedId: 3, name: 'Merino', categoryId: 3 },
-          { breedId: 4, name: 'Rhode Island Red', categoryId: 4 }
-        ],
-        analytics: {
-          totalAnimals: 2,
-          totalValue: 2000,
-          healthyAnimals: 2,
-          sickAnimals: 0,
-          categoryBreakdown: [
-            { category: 'Cattle', count: 1, value: 1200 },
-            { category: 'Pigs', count: 1, value: 800 }
-          ],
-          recentActivities: [
-            { action: 'Added new animal', animal: 'COW001 - Bessie', time: '2 hours ago' },
-            { action: 'Health check completed', animal: 'PIG001 - Porky', time: '1 day ago' }
-          ]
-        }
-      });
+
+        // Wait before retrying (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * attempt));
+      }
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Not available';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+  // Enhanced API call handler with better error handling
+  const apiCall = async (endpoint, options = {}) => {
+    const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
+
+    const response = await fetch(url, {
+      headers: getAuthHeaders(),
+      ...options
     });
+
+    // Handle different HTTP status codes
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+
+      switch (response.status) {
+        case 401:
+          console.warn('Unauthorized access - redirecting to login');
+          onLogout();
+          throw new Error('Unauthorized access');
+        case 403:
+          throw new Error('Access forbidden');
+        case 404:
+          throw new Error('Resource not found');
+        case 500:
+          throw new Error('Server error');
+        default:
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      return response.json();
+    }
+
+    return response.text();
   };
 
+  // Set loading state helper
+  const setLoadingState = (key, isLoading) => {
+    setLoading(prev => ({ ...prev, [key]: isLoading }));
+  };
+
+  // Set error state helper
+  const setErrorState = (key, errorMessage) => {
+    setError(prev => ({ ...prev, [key]: errorMessage }));
+  };
+
+  // Fetch categories from database
+  const fetchCategories = async () => {
+    setLoadingState('categories', true);
+    setErrorState('categories', null);
+
+    try {
+      const data = await withRetry(() => apiCall('/categories'));
+
+      // Validate and process categories data
+      const categories = Array.isArray(data) ? data : (data?.data || []);
+
+      // Ensure each category has required fields
+      const processedCategories = categories.map(category => ({
+        categoryId: category.categoryId || category.id,
+        name: category.name || 'Unknown Category',
+        color: category.color || '#6B7280', // Default gray color
+        description: category.description || '',
+        createdAt: category.createdAt,
+        updatedAt: category.updatedAt
+      }));
+
+      setLivestockData(prev => ({ ...prev, categories: processedCategories }));
+      console.log(`Successfully loaded ${processedCategories.length} categories`);
+
+    } catch (err) {
+      console.error('Failed to fetch categories:', err);
+      setErrorState('categories', err.message);
+
+      // Set empty array instead of fallback data
+      setLivestockData(prev => ({ ...prev, categories: [] }));
+    } finally {
+      setLoadingState('categories', false);
+    }
+  };
+
+  // Fetch breeds from database
+  const fetchBreeds = async () => {
+    setLoadingState('breeds', true);
+    setErrorState('breeds', null);
+
+    try {
+      const data = await withRetry(() => apiCall('/breeds'));
+
+      // Validate and process breeds data
+      const breeds = Array.isArray(data) ? data : (data?.data || []);
+
+      const processedBreeds = breeds.map(breed => ({
+        breedId: breed.breedId || breed.id,
+        name: breed.name || 'Unknown Breed',
+        categoryId: breed.categoryId || breed.category_id,
+        description: breed.description || '',
+        createdAt: breed.createdAt,
+        updatedAt: breed.updatedAt
+      }));
+
+      setLivestockData(prev => ({ ...prev, breeds: processedBreeds }));
+      console.log(`Successfully loaded ${processedBreeds.length} breeds`);
+
+    } catch (err) {
+      console.error('Failed to fetch breeds:', err);
+      setErrorState('breeds', err.message);
+
+      setLivestockData(prev => ({ ...prev, breeds: [] }));
+    } finally {
+      setLoadingState('breeds', false);
+    }
+  };
+
+  // Fetch livestock data from database
+  const fetchLivestockData = async () => {
+    setLoadingState('animals', true);
+    setErrorState('animals', null);
+
+    try {
+      const data = await withRetry(() => apiCall('/livestock'));
+
+      // Handle different response structures
+      const animals = Array.isArray(data) ? data : (data?.data || data?.content || []);
+
+      // Process and validate animal data
+      const processedAnimals = animals.map(animal => ({
+        livestockId: animal.livestockId || animal.id,
+        tagNumber: animal.tagNumber || `ANIMAL-${animal.livestockId || animal.id}`,
+        name: animal.name || 'Unnamed',
+        category: {
+          categoryId: animal.category?.categoryId || animal.categoryId,
+          name: animal.category?.name || animal.categoryName || 'Unknown Category'
+        },
+        breed: {
+          breedId: animal.breed?.breedId || animal.breedId,
+          name: animal.breed?.name || animal.breedName || 'Unknown Breed'
+        },
+        gender: animal.gender || 'UNKNOWN',
+        healthStatus: animal.healthStatus || 'UNKNOWN',
+        weightKg: animal.weightKg || animal.weight || 0,
+        currentValue: animal.currentValue || animal.acquisitionCost || 0,
+        acquisitionDate: animal.acquisitionDate,
+        acquisitionCost: animal.acquisitionCost || 0,
+        dateOfBirth: animal.dateOfBirth,
+        estimatedAgeMonths: animal.estimatedAgeMonths || 0,
+        color: animal.color || '',
+        locationOnFarm: animal.locationOnFarm || '',
+        notes: animal.notes || '',
+        images: animal.images || [],
+        microchipNumber: animal.microchipNumber || '',
+        insurancePolicyNumber: animal.insurancePolicyNumber || '',
+        insuranceValue: animal.insuranceValue || 0,
+        isForSale: animal.isForSale || false,
+        salePrice: animal.salePrice || 0,
+        motherId: animal.motherId,
+        fatherId: animal.fatherId,
+        identificationMarks: animal.identificationMarks || '',
+        createdAt: animal.createdAt,
+        updatedAt: animal.updatedAt
+      }));
+
+      setLivestockData(prev => ({ ...prev, animals: processedAnimals }));
+      console.log(`Successfully loaded ${processedAnimals.length} animals`);
+
+      // After loading animals, calculate analytics
+      await calculateAnalytics(processedAnimals);
+
+    } catch (err) {
+      console.error('Failed to fetch livestock data:', err);
+      setErrorState('animals', err.message);
+
+      setLivestockData(prev => ({ ...prev, animals: [] }));
+    } finally {
+      setLoadingState('animals', false);
+    }
+  };
+
+  // Calculate analytics from actual data instead of separate API call
+  const calculateAnalytics = async (animals = null) => {
+    setLoadingState('analytics', true);
+    setErrorState('analytics', null);
+
+    try {
+      const animalData = animals || livestockData.animals;
+
+      // Calculate basic statistics
+      const totalAnimals = animalData.length;
+      const totalValue = animalData.reduce((sum, animal) => sum + (animal.currentValue || 0), 0);
+      const healthyAnimals = animalData.filter(animal =>
+          animal.healthStatus === 'HEALTHY' || animal.healthStatus === 'healthy'
+      ).length;
+      const sickAnimals = animalData.filter(animal =>
+          animal.healthStatus === 'SICK' || animal.healthStatus === 'sick'
+      ).length;
+
+      // Calculate category breakdown
+      const categoryMap = new Map();
+      animalData.forEach(animal => {
+        const categoryName = animal.category?.name || 'Unknown';
+        const existing = categoryMap.get(categoryName) || { category: categoryName, count: 0, value: 0 };
+        existing.count += 1;
+        existing.value += animal.currentValue || 0;
+        categoryMap.set(categoryName, existing);
+      });
+
+      const categoryBreakdown = Array.from(categoryMap.values());
+
+      // Generate recent activities (you might want to fetch these from a separate endpoint)
+      const recentActivities = animalData
+          .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+          .slice(0, 5)
+          .map(animal => ({
+            action: 'Animal registered',
+            animal: `${animal.tagNumber} - ${animal.name}`,
+            time: formatRelativeTime(animal.createdAt)
+          }));
+
+      const analytics = {
+        totalAnimals,
+        totalValue,
+        healthyAnimals,
+        sickAnimals,
+        categoryBreakdown,
+        recentActivities
+      };
+
+      setLivestockData(prev => ({ ...prev, analytics }));
+      console.log('Analytics calculated successfully');
+
+    } catch (err) {
+      console.error('Failed to calculate analytics:', err);
+      setErrorState('analytics', err.message);
+    } finally {
+      setLoadingState('analytics', false);
+    }
+  };
+
+  // Alternative: Fetch analytics from dedicated endpoint (if available)
+  const fetchAnalyticsFromAPI = async () => {
+    setLoadingState('analytics', true);
+    setErrorState('analytics', null);
+
+    try {
+      const data = await withRetry(() => apiCall('/livestock/analytics'));
+      const analytics = data?.data || data || {};
+
+      setLivestockData(prev => ({
+        ...prev,
+        analytics: {
+          totalAnimals: analytics.totalAnimals || 0,
+          totalValue: analytics.totalValue || 0,
+          healthyAnimals: analytics.healthyAnimals || 0,
+          sickAnimals: analytics.sickAnimals || 0,
+          categoryBreakdown: analytics.categoryBreakdown || [],
+          recentActivities: analytics.recentActivities || []
+        }
+      }));
+
+    } catch (err) {
+      console.error('Failed to fetch analytics:', err);
+      setErrorState('analytics', err.message);
+
+      // Fall back to calculated analytics
+      await calculateAnalytics();
+    } finally {
+      setLoadingState('analytics', false);
+    }
+  };
+
+  // Refresh all data
+  const refreshData = async () => {
+    console.log('Refreshing all data...');
+    await initializeData();
+  };
+
+  // Format relative time utility
+  const formatRelativeTime = (dateString) => {
+    if (!dateString) return 'Unknown time';
+
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffInSeconds = Math.floor((now - date) / 1000);
+
+      if (diffInSeconds < 60) return 'Just now';
+      if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+      if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+      return `${Math.floor(diffInSeconds / 86400)} days ago`;
+    } catch {
+      return 'Unknown time';
+    }
+  };
+
+  // Format date utility
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Not available';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch (err) {
+      return 'Invalid date';
+    }
+  };
+
+  // Handle notification changes
   const handleNotificationChange = (key) => {
     setNotifications(prev => ({
       ...prev,
@@ -161,78 +416,81 @@ function Dashboard({ user, onLogout }) {
     }));
   };
 
-  // Handler for when animal is successfully added
-  const handleAnimalAdded = () => {
-    fetchLivestockData(); // Refresh the data
+  // Handle animal added successfully
+  const handleAnimalAdded = async () => {
     setShowAddAnimalModal(false);
+    console.log('Animal added successfully, refreshing data...');
+    await fetchLivestockData(); // Refresh animals and analytics
   };
 
+  // Handle password change
   const handlePasswordChange = async (e) => {
     e.preventDefault();
+
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       alert('New passwords do not match');
       return;
     }
 
+    if (passwordData.newPassword.length < 6) {
+      alert('New password must be at least 6 characters long');
+      return;
+    }
+
     try {
-      // Replace with your actual API endpoint
-      const response = await fetch('http://localhost:8080/api/user/change-password', {
+      await apiCall('/user/change-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.accessToken}`
-        },
         body: JSON.stringify({
           currentPassword: passwordData.currentPassword,
           newPassword: passwordData.newPassword
         })
       });
 
-      if (response.ok) {
-        alert('Password updated successfully');
-        setPasswordData({
-          currentPassword: '',
-          newPassword: '',
-          confirmPassword: ''
-        });
-      } else {
-        alert('Failed to update password');
-      }
+      alert('Password updated successfully');
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
     } catch (error) {
       console.error('Error updating password:', error);
-      alert('Error updating password');
+      alert(`Failed to update password: ${error.message}`);
     }
   };
 
+  // Filter animals based on category and search
   const filteredAnimals = livestockData.animals.filter(animal => {
-    const matchesCategory = selectedCategory === 'all' || animal.category.name === selectedCategory;
-    const matchesSearch = animal.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        animal.tagNumber.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' ||
+        animal.category?.name === selectedCategory;
+    const matchesSearch = searchTerm === '' ||
+        animal.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        animal.tagNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
+  // Statistics for dashboard cards
   const stats = [
     {
       label: 'Total Livestock',
-      value: livestockData.analytics.totalAnimals.toString(),
+      value: livestockData.analytics.totalAnimals?.toString() || '0',
       icon: Users,
       color: 'bg-blue-500'
     },
     {
       label: 'Total Value',
-      value: `$${livestockData.analytics.totalValue.toLocaleString()}`,
+      value: `$${(livestockData.analytics.totalValue || 0).toLocaleString()}`,
       icon: TrendingUp,
       color: 'bg-green-500'
     },
     {
       label: 'Healthy Animals',
-      value: livestockData.analytics.healthyAnimals.toString(),
+      value: livestockData.analytics.healthyAnimals?.toString() || '0',
       icon: Activity,
       color: 'bg-emerald-500'
     },
     {
       label: 'Health Alerts',
-      value: livestockData.analytics.sickAnimals.toString(),
+      value: livestockData.analytics.sickAnimals?.toString() || '0',
       icon: Bell,
       color: 'bg-red-500'
     }
@@ -248,7 +506,6 @@ function Dashboard({ user, onLogout }) {
       : (user.username || 'User');
 
   const welcomeName = user.firstName || user.username || 'User';
-
   return (
       <div className="min-h-screen bg-gray-50">
         {/* Header */}

@@ -26,15 +26,19 @@ const App = () => {
     const handleLogin = (userData) => {
         console.log('Login data received:', userData);
 
-        // Extract the user data properly
-        const userInfo = userData.data || userData;
+        // Safely extract nested user payload
+        const fullData = userData.data?.data || userData.user || userData;
 
-        // Store the complete user session
-        authService._storeUserSession(userInfo);
-        setUser(userInfo);
+        // Extract tokens
+        const token = userData.token || fullData.accessToken;
+        const refreshToken = fullData.refreshToken;
 
-        // Navigate based on role
-        const userRole = userInfo.role || userInfo.user?.role;
+        // Store session
+        authService._storeUserSession(fullData, token, refreshToken);
+        setUser(fullData);
+
+        // Safely extract the role
+        const userRole = fullData.role;
         console.log('User role:', userRole);
 
         switch (userRole) {
@@ -51,7 +55,7 @@ const App = () => {
                 break;
             default:
                 console.warn('Unknown role:', userRole);
-                navigate('/dashboard'); // Default fallback
+                navigate('/dashboard');
         }
     };
 
