@@ -33,6 +33,7 @@ public class LivestockService {
         this.categoryRepository = categoryRepository;
     }
 
+    // ✅ Add livestock without image
     public Livestock addLivestock(LivestockDto dto, Long userId) {
         FarmerProfile farmer = farmerProfileRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Farmer profile not found for user ID: " + userId));
@@ -42,15 +43,18 @@ public class LivestockService {
         return repository.save(livestock);
     }
 
+    // ✅ Add livestock with image
     public Livestock addLivestockWithImage(LivestockDto dto, MultipartFile image, Long userId) throws IOException {
-        String imagePath = saveImageToFileSystem(image);
+        String imagePath = image != null ? saveImageToFileSystem(image) : null;
 
         FarmerProfile farmer = farmerProfileRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Farmer profile not found for user ID: " + userId));
 
         Livestock livestock = convertDtoToEntity(dto);
         livestock.setFarmer(farmer);
-        livestock.setImages("[\"" + imagePath + "\"]"); // Store as JSON array string
+        if (imagePath != null) {
+            livestock.setImages("[\"" + imagePath + "\"]"); // Store as JSON array string
+        }
         return repository.save(livestock);
     }
 
@@ -66,45 +70,53 @@ public class LivestockService {
         return filename;
     }
 
-    public Livestock updateLivestock(Long id, LivestockDto dto, String username) {
-        Livestock livestock = getLivestockById(id, username);
+    // ✅ Update livestock by email
+    public Livestock updateLivestockByEmail(Long id, LivestockDto dto, String email) {
+        Livestock livestock = getLivestockByIdAndEmail(id, email);
         updateEntityFromDto(livestock, dto);
         return repository.save(livestock);
     }
 
-    public void deleteLivestock(Long id, String username) {
-        Livestock livestock = getLivestockById(id, username);
+    // ✅ Delete livestock by email
+    public void deleteLivestockByEmail(Long id, String email) {
+        Livestock livestock = getLivestockByIdAndEmail(id, email);
         repository.delete(livestock);
     }
 
-    public Livestock getLivestockById(Long id, String username) {
-        return repository.findByIdAndFarmer_User_Username(id.intValue(), username)
+    // ✅ Get livestock by ID & email
+    public Livestock getLivestockByIdAndEmail(Long id, String email) {
+        return repository.findByIdAndFarmer_User_Email(id.intValue(), email)
                 .orElseThrow(() -> new RuntimeException("Livestock not found with id: " + id));
     }
 
-    public List<Livestock> getFarmerLivestock(String username, int page, int size) {
+    // ✅ Get all livestock by email (paginated)
+    public List<Livestock> getFarmerLivestockByEmail(String email, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return repository.findByFarmer_User_Username(username, pageable).getContent();
+        return repository.findByFarmer_User_Email(email, pageable).getContent();
     }
 
-    public List<Livestock> searchLivestock(String query, String username, int page, int size) {
+    // ✅ Search livestock by email
+    public List<Livestock> searchLivestockByEmail(String query, String email, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return repository.findByFarmer_User_UsernameAndNameContainingIgnoreCase(username, query, pageable).getContent();
+        return repository.findByFarmer_User_EmailAndNameContainingIgnoreCase(email, query, pageable).getContent();
     }
 
-    public List<Livestock> filterLivestock(String type, String breed, String status, String username, int page, int size) {
+    // ✅ Filter livestock by email
+    public List<Livestock> filterLivestockByEmail(String type, String breed, String status, String email, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return repository.findByFilters(type, breed, status, username, pageable).getContent();
+        return repository.findByFilters(type, breed, status, email, pageable).getContent();
     }
 
-    public void addHealthRecord(Long id, String healthRecord, String username) {
-        Livestock livestock = getLivestockById(id, username);
+    // ✅ Add health record by email
+    public void addHealthRecordByEmail(Long id, String healthRecord, String email) {
+        Livestock livestock = getLivestockByIdAndEmail(id, email);
         String notes = Optional.ofNullable(livestock.getNotes()).orElse("");
         notes += notes.isEmpty() ? "Health Record: " + healthRecord : "\nHealth Record: " + healthRecord;
         livestock.setNotes(notes);
         repository.save(livestock);
     }
 
+    // ✅ Convert DTO -> Entity
     private Livestock convertDtoToEntity(LivestockDto dto) {
         Livestock livestock = new Livestock();
         livestock.setName(dto.getName());
@@ -130,6 +142,7 @@ public class LivestockService {
         return livestock;
     }
 
+    // ✅ Update entity from DTO
     private void updateEntityFromDto(Livestock livestock, LivestockDto dto) {
         livestock.setName(dto.getName());
         livestock.setEstimatedAgeMonths(dto.getAge());

@@ -20,14 +20,21 @@ public interface LivestockRepository extends JpaRepository<Livestock, Integer> {
     // Basic method to find livestock by farmer's username with pagination
     Page<Livestock> findByFarmer_User_Username(String username, Pageable pageable);
 
-    // Search functionality - search by name
+    // Search functionality - search by name using username
     Page<Livestock> findByFarmer_User_UsernameAndNameContainingIgnoreCase(String username, String query, Pageable pageable);
 
-    // Method to find a single livestock by ID and verify ownership
+    // Search functionality - search by name using email
+    Page<Livestock> findByFarmer_User_EmailAndNameContainingIgnoreCase(String email, String query, Pageable pageable);
+
+    // Method to find a single livestock by ID and verify ownership via username
     @Query("SELECT l FROM Livestock l WHERE l.livestockId = :id AND l.farmer.user.username = :username")
     Optional<Livestock> findByIdAndFarmer_User_Username(@Param("id") Integer id, @Param("username") String username);
 
-    // Filtering functionality - updated to match actual entity structure
+    // Method to find a single livestock by ID and verify ownership via email
+    @Query("SELECT l FROM Livestock l WHERE l.livestockId = :id AND l.farmer.user.email = :email")
+    Optional<Livestock> findByIdAndFarmer_User_Email(@Param("id") Integer id, @Param("email") String email);
+
+    // Filter by category, breed, and status
     @Query("SELECT l FROM Livestock l WHERE l.farmer.user.username = :username " +
             "AND (:categoryName IS NULL OR l.category.name = :categoryName) " +
             "AND (:breedName IS NULL OR l.breed.name = :breedName) " +
@@ -38,9 +45,7 @@ public interface LivestockRepository extends JpaRepository<Livestock, Integer> {
                                   @Param("username") String username,
                                   Pageable pageable);
 
-    // Additional useful methods
-
-    // Find by tag number (unique identifier)
+    // Find by tag number and username
     @Query("SELECT l FROM Livestock l WHERE l.tagNumber = :tagNumber AND l.farmer.user.username = :username")
     Optional<Livestock> findByTagNumberAndFarmer_User_Username(@Param("tagNumber") String tagNumber, @Param("username") String username);
 
@@ -54,6 +59,12 @@ public interface LivestockRepository extends JpaRepository<Livestock, Integer> {
     // Find by breed
     @Query("SELECT l FROM Livestock l WHERE l.farmer.user.username = :username AND l.breed.name = :breedName")
     Page<Livestock> findByFarmer_User_UsernameAndBreed_Name(@Param("username") String username, @Param("breedName") String breedName, Pageable pageable);
+
+    // Find all livestock by farmer's email (pagination supported)
+    Page<Livestock> findByFarmer_User_Email(String email, Pageable pageable);
+
+    // Find all livestock by farmer's email (no pagination)
+    List<Livestock> findByFarmer_User_Email(String email);
 
     // Count livestock by farmer
     long countByFarmer_User_Username(String username);

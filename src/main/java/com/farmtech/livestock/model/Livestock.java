@@ -135,6 +135,8 @@ public class Livestock {
         updatedAt = LocalDateTime.now();
     }
 
+
+
     public enum Gender {
         MALE, FEMALE
     }

@@ -1,8 +1,8 @@
 package com.farmtech.livestock.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 @Data
 @NoArgsConstructor
@@ -10,5 +10,6 @@ import lombok.AllArgsConstructor;
 public class SimpleLivestockDto {
     private Integer livestockId;
     private String name;
-    private String tagNumber;
+    private String categoryName;
+    private String breedName;
 }

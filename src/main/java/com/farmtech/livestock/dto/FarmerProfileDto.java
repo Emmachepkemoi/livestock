@@ -11,16 +11,14 @@ import java.util.List;
 @AllArgsConstructor
 public class FarmerProfileDto {
 
-    private Integer id;
-    private String fullName;
-    private String nationalId;
-    private String farmName;
-    private String location;
-    private String phoneNumber;
-    private String email;
-    private String profileImage;
+    private Integer id;                     // FarmerProfile ID
 
-    // Instead of full LivestockDto to prevent large or circular responses,
-    // use simplified version or just IDs if needed.
+    private String firstName;
+    private String lastName;// Derived from User (firstName + lastName)
+    private String farmName;                // From FarmerProfile
+    private String phoneNumber;             // From User
+    private String email;                   // From User
+
+    // List of livestock (can be simplified or partial)
     private List<SimpleLivestockDto> livestock;
 }

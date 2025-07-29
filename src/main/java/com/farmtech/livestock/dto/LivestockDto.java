@@ -46,6 +46,9 @@ public class LivestockDto {
     @JsonIgnoreProperties({"livestock"})
     private FarmerProfileDto farmer;
 
+    public LivestockDto(Integer livestockId, String name, Integer integer, Integer integer1, String s, String s1, Double aDouble, String tagNumber, String color, LocalDate dateOfBirth, Integer estimatedAgeMonths, String locationOnFarm, String notes, String images) {
+    }
+
     // Convenience methods
     public Integer getAge() {
         return this.estimatedAgeMonths;
