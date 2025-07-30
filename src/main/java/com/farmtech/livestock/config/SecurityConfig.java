@@ -4,6 +4,7 @@ import com.farmtech.livestock.security.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -42,6 +43,8 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/livestock/**").hasAnyAuthority("FARMER", "ADMIN")
                         .requestMatchers("/api/categories/**").hasAnyAuthority("FARMER", "ADMIN")
+                        .requestMatchers("/api/health-records/**").hasAnyAuthority("VETERINARIAN", "ADMIN")
+                                .requestMatchers(HttpMethod.GET, "/api/health-records/**").hasAnyAuthority("VETERINARIAN", "ADMIN", "FARMER")
                         .requestMatchers("/api/breeds/**").hasAnyAuthority("FARMER", "ADMIN")
                         .requestMatchers("/api/livestock/analytics").hasAnyAuthority("FARMER", "ADMIN")
 

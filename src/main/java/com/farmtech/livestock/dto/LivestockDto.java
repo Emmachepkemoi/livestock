@@ -21,10 +21,8 @@ public class LivestockDto {
     private String name;
     private String gender; // "MALE" or "FEMALE"
     private LocalDate dateOfBirth;
-    private Integer estimatedAgeMonths;
-    private Integer age; // For backward compatibility
-    private Double weightKg;
-    private Double weight; // For backward compatibility
+    private Integer estimatedAgeMonths; // will also represent "age"
+    private Double weightKg; // will also represent "weight"
     private String color;
     private String healthStatus; // "HEALTHY", "SICK", etc.
     private LocalDate acquisitionDate;
@@ -46,17 +44,16 @@ public class LivestockDto {
     @JsonIgnoreProperties({"livestock"})
     private FarmerProfileDto farmer;
 
-    public LivestockDto(Integer livestockId, String name, Integer integer, Integer integer1, String s, String s1, Double aDouble, String tagNumber, String color, LocalDate dateOfBirth, Integer estimatedAgeMonths, String locationOnFarm, String notes, String images) {
-    }
+    // 🔹 Remove the confusing constructor at the bottom - it's not used properly
+    // Instead use Lombok's @AllArgsConstructor and @NoArgsConstructor
 
-    // Convenience methods
+    // Convenience methods for backward compatibility
     public Integer getAge() {
         return this.estimatedAgeMonths;
     }
 
     public void setAge(Integer age) {
         this.estimatedAgeMonths = age;
-        this.age = age;
     }
 
     public Double getWeight() {
@@ -65,6 +62,5 @@ public class LivestockDto {
 
     public void setWeight(Double weight) {
         this.weightKg = weight;
-        this.weight = weight;
     }
 }

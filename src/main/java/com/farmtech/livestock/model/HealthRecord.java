@@ -97,10 +97,18 @@ public class HealthRecord {
     }
 
     public enum ExaminationType {
-        ROUTINE_CHECKUP, SICK_VISIT, FOLLOW_UP, EMERGENCY
+        ROUTINE_CHECKUP, SICK_VISIT, FOLLOW_UP, EMERGENCY;
+
+        public String toUpperCase() {
+            return "";
+        }
     }
 
     public enum RecordStatus {
-        ACTIVE, RESOLVED, ONGOING
+        ACTIVE, RESOLVED, ONGOING;
+
+        public String toUpperCase() {
+            return "";
+        }
     }
 }

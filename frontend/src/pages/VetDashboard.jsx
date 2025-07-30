@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import AddHealthRecord from './AddHealthRecord';
+import axios from "axios";
 import {
     Bell, Activity, Calendar, Users, AlertTriangle, FileText, Pill,
     Thermometer, Heart, MapPin, Clock, Search, Filter, Plus, TrendingUp,
@@ -139,80 +141,119 @@ const AppointmentCard = ({ appointment }) => {
     );
 };
 
-// Health Record Card Component
 const HealthRecordCard = ({ record }) => {
     const statusColors = {
-        "Healthy": "text-green-600",
-        "Under Treatment": "text-yellow-600",
-        "Critical": "text-red-600"
+        ACTIVE: "text-green-600",
+        RESOLVED: "text-yellow-600",
+        ONGOING: "text-red-600"
     };
 
     return (
         <div className="bg-white rounded-lg shadow p-6">
+            {/* Header */}
             <div className="flex justify-between items-start mb-4">
                 <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Animal ID: {record.animalId}</h3>
-                    <p className="text-gray-600">{record.animalType} - {record.farmerName}</p>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                        Animal ID: {record.livestockId}
+                    </h3>
                 </div>
-                <span className={`font-medium ${statusColors[record.healthStatus]}`}>
-                    {record.healthStatus}
+                <span className={`font-medium ${statusColors[record.status]}`}>
+                    {record.status}
                 </span>
             </div>
 
+            {/* Health Info */}
             <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
-                    <p className="text-sm text-gray-600">Last Visit</p>
-                    <p className="font-medium">{record.lastVisit}</p>
+                    <p className="text-sm text-gray-600">Examination Date</p>
+                    <p className="font-medium">{record.examinationDate}</p>
                 </div>
                 <div>
                     <p className="text-sm text-gray-600">Weight</p>
-                    <p className="font-medium">{record.weight}</p>
+                    <p className="font-medium">{record.weightKg} Kg</p>
                 </div>
                 <div>
                     <p className="text-sm text-gray-600">Temperature</p>
-                    <p className="font-medium flex items-center">
-                        <Thermometer className="h-4 w-4 mr-1" />
-                        {record.temperature}
-                    </p>
+                    <p className="font-medium">{record.temperatureCelsius} °C</p>
                 </div>
                 <div>
-                    <p className="text-sm text-gray-600">Next Vaccination</p>
-                    <p className="font-medium">{record.nextVaccination}</p>
+                    <p className="text-sm text-gray-600">Heart Rate</p>
+                    <p className="font-medium">{record.heartRateBpm} bpm</p>
                 </div>
             </div>
 
+            {/* Symptoms */}
             <div>
-                <p className="text-sm text-gray-600 mb-2">Vaccinations</p>
+                <p className="text-sm text-gray-600 mb-2">Symptoms</p>
                 <div className="flex flex-wrap gap-2">
-                    {record.vaccinations.map((vaccine, index) => (
-                        <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                            {vaccine}
-                        </span>
-                    ))}
+                    {record.symptoms && record.symptoms.length > 0 ? (
+                        record.symptoms.map((symptom, index) => (
+                            <span key={index} className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-sm">
+                                {symptom}
+                            </span>
+                        ))
+                    ) : (
+                        <span className="text-gray-500 text-sm">None</span>
+                    )}
+                </div>
+            </div>
+
+            {/* Medications */}
+            <div className="mt-4">
+                <p className="text-sm text-gray-600 mb-2">Medications / Vaccinations</p>
+                <div className="flex flex-wrap gap-2">
+                    {record.medicationsPrescribed && record.medicationsPrescribed.length > 0 ? (
+                        record.medicationsPrescribed.map((med, index) => (
+                            <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                                {med}
+                            </span>
+                        ))
+                    ) : (
+                        <span className="text-gray-500 text-sm">None</span>
+                    )}
                 </div>
             </div>
         </div>
     );
 };
 
+
 const VetDashboard = () => {
     const navigate = useNavigate();
     const [user, setUser] = useState(null);
     const [isLoggedIn, setIsLoggedIn] = useState(true);
-    const [activeTab, setActiveTab] = useState('overview');
-    const [searchTerm, setSearchTerm] = useState('');
-    const [selectedFilter, setSelectedFilter] = useState('all');
+    const [activeTab, setActiveTab] = useState("overview");
+    const [searchTerm, setSearchTerm] = useState("");
+    const [selectedFilter, setSelectedFilter] = useState("all");
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    const [healthRecords, setHealthRecords] = useState([]);
+    const token = localStorage.getItem('token');
 
     useEffect(() => {
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-            setUser(JSON.parse(storedUser));
-        } else {
-            navigate('/login');
-        }
-    }, [navigate]);
+        const fetchRecords = async () => {
+            try {
+                const res = await fetch("http://localhost:8080/api/health-records", {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+                const data = await res.json();
+                if (data.success) {
+                    setHealthRecords(data.data); // Assuming ApiResponse returns data
+                } else {
+                    console.error("Failed to fetch health records:", data.message);
+                }
+            } catch (err) {
+                console.error("Error fetching health records:", err);
+            }
+        };
 
-    // Demo data - in real app, this would come from your API
+        fetchRecords();
+    }, [token]);
+
+    // Appointments state (demo data)
     const [appointments] = useState([
         {
             id: 1,
@@ -241,50 +282,42 @@ const VetDashboard = () => {
             status: 'urgent',
             priority: 'high',
             phone: '+254700654321'
-        },
-        {
-            id: 3,
-            farmerId: 'F003',
-            farmerName: 'Peter Kamau',
-            location: 'Eldoret Poultry',
-            time: '02:00 PM',
-            date: '2025-07-26',
-            animalType: 'Poultry',
-            animalId: 'P123',
-            reason: 'Health Check',
-            status: 'scheduled',
-            priority: 'low',
-            phone: '+254700987654'
         }
     ]);
 
-    const [healthRecords] = useState([
-        {
-            id: 1,
-            animalId: 'C001',
-            animalType: 'Cattle',
-            farmerName: 'John Doe',
-            lastVisit: '2025-07-15',
-            healthStatus: 'Healthy',
-            vaccinations: ['FMD', 'Anthrax'],
-            nextVaccination: '2025-09-15',
-            weight: '450kg',
-            temperature: '38.5°C'
-        },
-        {
-            id: 2,
-            animalId: 'C045',
-            animalType: 'Cattle',
-            farmerName: 'Mary Smith',
-            lastVisit: '2025-07-20',
-            healthStatus: 'Under Treatment',
-            vaccinations: ['FMD'],
-            nextVaccination: '2025-08-28',
-            weight: '380kg',
-            temperature: '39.2°C'
+    // Load user from localStorage on component mount
+    useEffect(() => {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+            try {
+                setUser(JSON.parse(storedUser));
+            } catch (error) {
+                console.error('Error parsing stored user:', error);
+                navigate('/login');
+            }
+        } else {
+            navigate('/login');
         }
-    ]);
+    }, [navigate]);
 
+
+
+    // Add new health record dynamically
+    const handleRecordAdded = (newRecord) => {
+        const recordWithId = {
+            ...newRecord,
+            id: healthRecords.length + 1
+        };
+        setHealthRecords([...healthRecords, recordWithId]);
+        setIsModalOpen(false);
+    };
+
+    // Handle save record (corrected function name)
+    const handleSaveRecord = (newRecord) => {
+        handleRecordAdded(newRecord);
+    };
+
+    // Calculate dashboard stats
     const dashboardStats = {
         totalAppointments: appointments.length,
         urgentCases: appointments.filter(a => a.priority === 'high').length,
@@ -328,6 +361,17 @@ const VetDashboard = () => {
 
     const displayName = capitalize(user.username || 'Veterinarian');
     const userInitials = displayName.split(' ').map(name => name.charAt(0)).join('').substring(0, 2).toUpperCase();
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-500"></div>
+                    <p className="mt-4 text-gray-600">Loading dashboard...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -446,7 +490,10 @@ const VetDashboard = () => {
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
                             <h2 className="text-xl font-bold text-gray-900">Health Records</h2>
-                            <button className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 flex items-center">
+                            <button
+                                className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 flex items-center"
+                                onClick={() => setIsModalOpen(true)}
+                            >
                                 <Plus className="h-5 w-5 mr-2" />
                                 Add Record
                             </button>
@@ -459,6 +506,13 @@ const VetDashboard = () => {
                         </div>
                     </div>
                 )}
+
+                {/* Render modal */}
+                <AddHealthRecord
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    onSave={handleSaveRecord}
+                />
             </main>
         </div>
     );

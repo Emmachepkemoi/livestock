@@ -135,6 +135,13 @@ public class Livestock {
         updatedAt = LocalDateTime.now();
     }
 
+    public Integer getFatherId() {
+        return 0;
+    }
+
+    public Integer getMotherId() {
+        return 0;
+    }
 
 
     public enum Gender {

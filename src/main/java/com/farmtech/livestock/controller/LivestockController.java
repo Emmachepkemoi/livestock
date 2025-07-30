@@ -40,7 +40,7 @@ public class LivestockController {
             Livestock saved = livestockService.addLivestockWithImage(livestockDto, image, userId);
 
             return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(new ApiResponse<>(true, "Livestock added successfully", mapToDto(saved)));
+                    .body(new ApiResponse<>(true, "Livestock added successfully", convertToDto(saved)));
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ApiResponse<>(false, "Image upload failed: " + e.getMessage(), null));
@@ -61,7 +61,7 @@ public class LivestockController {
             List<Livestock> livestockList = livestockService.getFarmerLivestockByEmail(email, page, size);
 
             List<LivestockDto> livestockDtos = livestockList.stream()
-                    .map(this::mapToDto)
+                    .map(this::convertToDto)
                     .collect(Collectors.toList());
 
             return ResponseEntity.ok(new ApiResponse<>(true, "Livestock retrieved", livestockDtos));
@@ -79,7 +79,7 @@ public class LivestockController {
         try {
             String email = authentication.getName();
             Livestock livestock = livestockService.getLivestockByIdAndEmail(id, email);
-            return ResponseEntity.ok(new ApiResponse<>(true, "Livestock found", mapToDto(livestock)));
+            return ResponseEntity.ok(new ApiResponse<>(true, "Livestock found", convertToDto(livestock)));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(new ApiResponse<>(false, e.getMessage(), null));
@@ -95,7 +95,7 @@ public class LivestockController {
         try {
             String email = authentication.getName();
             Livestock updated = livestockService.updateLivestockByEmail(id, livestockDto, email);
-            return ResponseEntity.ok(new ApiResponse<>(true, "Livestock updated", mapToDto(updated)));
+            return ResponseEntity.ok(new ApiResponse<>(true, "Livestock updated", convertToDto(updated)));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(new ApiResponse<>(false, e.getMessage(), null));
@@ -129,7 +129,7 @@ public class LivestockController {
             List<Livestock> results = livestockService.searchLivestockByEmail(query, email, page, size);
 
             List<LivestockDto> dtos = results.stream()
-                    .map(this::mapToDto)
+                    .map(this::convertToDto)
                     .collect(Collectors.toList());
 
             return ResponseEntity.ok(new ApiResponse<>(true, "Search results", dtos));
@@ -153,7 +153,7 @@ public class LivestockController {
             List<Livestock> results = livestockService.filterLivestockByEmail(type, breed, status, email, page, size);
 
             List<LivestockDto> dtos = results.stream()
-                    .map(this::mapToDto)
+                    .map(this::convertToDto)
                     .collect(Collectors.toList());
 
             return ResponseEntity.ok(new ApiResponse<>(true, "Filtered results", dtos));
@@ -181,22 +181,40 @@ public class LivestockController {
     }
 
     // ✅ Helper to map entity -> DTO (avoid circular refs)
-    private LivestockDto mapToDto(Livestock livestock) {
-        return new LivestockDto(
-                livestock.getLivestockId(),
-                livestock.getName(),
-                livestock.getCategory() != null ? livestock.getCategory().getCategoryId() : null,
-                livestock.getBreed() != null ? livestock.getBreed().getBreedId() : null,
-                livestock.getHealthStatus() != null ? livestock.getHealthStatus().name() : null,
-                livestock.getGender() != null ? livestock.getGender().name() : null,
-                livestock.getWeightKg() != null ? livestock.getWeightKg().doubleValue() : null,
-                livestock.getTagNumber(),
-                livestock.getColor(),
-                livestock.getDateOfBirth(),
-                livestock.getEstimatedAgeMonths(),
-                livestock.getLocationOnFarm(),
-                livestock.getNotes(),
-                livestock.getImages()
-        );
+    private LivestockDto convertToDto(Livestock livestock) {
+        LivestockDto dto = new LivestockDto();
+        dto.setLivestockId(livestock.getLivestockId());
+        dto.setName(livestock.getName());
+        dto.setCategoryId(livestock.getCategory() != null ? livestock.getCategory().getCategoryId() : null);
+        dto.setCategoryName(livestock.getCategory() != null ? livestock.getCategory().getName() : null);
+        dto.setBreedId(livestock.getBreed() != null ? livestock.getBreed().getBreedId() : null);
+        dto.setBreedName(livestock.getBreed() != null ? livestock.getBreed().getName() : null);
+        dto.setTagNumber(livestock.getTagNumber());
+        dto.setGender(livestock.getGender() != null ? livestock.getGender().name() : null);
+        dto.setDateOfBirth(livestock.getDateOfBirth());
+        dto.setEstimatedAgeMonths(livestock.getEstimatedAgeMonths());
+
+        // Handle BigDecimal to Double conversion
+        dto.setWeightKg(livestock.getWeightKg() != null ? livestock.getWeightKg().doubleValue() : null);
+        dto.setAcquisitionCost(livestock.getAcquisitionCost() != null ? livestock.getAcquisitionCost().doubleValue() : null);
+        dto.setCurrentValue(livestock.getCurrentValue() != null ? livestock.getCurrentValue().doubleValue() : null);
+        dto.setInsuranceValue(livestock.getInsuranceValue() != null ? livestock.getInsuranceValue().doubleValue() : null);
+        dto.setSalePrice(livestock.getSalePrice() != null ? livestock.getSalePrice().doubleValue() : null);
+
+        dto.setColor(livestock.getColor());
+        dto.setHealthStatus(livestock.getHealthStatus() != null ? livestock.getHealthStatus().name() : null);
+        dto.setAcquisitionDate(livestock.getAcquisitionDate());
+        dto.setAcquisitionMethod(livestock.getAcquisitionMethod() != null ? livestock.getAcquisitionMethod().name() : null);
+        dto.setMotherId(livestock.getMotherId());
+        dto.setFatherId(livestock.getFatherId());
+        dto.setLocationOnFarm(livestock.getLocationOnFarm());
+        dto.setIdentificationMarks(livestock.getIdentificationMarks());
+        dto.setMicrochipNumber(livestock.getMicrochipNumber());
+        dto.setInsurancePolicyNumber(livestock.getInsurancePolicyNumber());
+        dto.setIsForSale(livestock.getIsForSale());
+        dto.setNotes(livestock.getNotes());
+        dto.setImages(livestock.getImages());
+
+        return dto;
     }
 }
