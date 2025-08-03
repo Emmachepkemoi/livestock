@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZoneId;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -34,6 +35,15 @@ public class UserService {
 
         return convertToUserDto(user);
     }
+
+    public Map<String, Long> countUsersByRole() {
+        List<User> users = userRepository.findAll();
+        Map<String, Long> roleCounts = users.stream()
+                .collect(Collectors.groupingBy(
+                        user -> user.getRole().getRoleName().name(), Collectors.counting()));
+        return roleCounts;
+    }
+
 
 
 

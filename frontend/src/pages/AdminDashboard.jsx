@@ -78,47 +78,63 @@ const AdminDashboard = () => {
         totalBreeds: 45 // Added for breed management
     });
 
-    const [farmers, setFarmers] = useState([
-        {
-            id: 'F001',
-            name: 'John Doe',
-            email: 'john.doe@email.com',
-            phone: '+254700123456',
-            location: 'Kiambu County',
-            farmSize: '50 acres',
-            animalCount: 120,
-            registrationDate: '2024-01-15',
-            status: 'active',
-            lastLogin: '2025-06-29',
-            subscription: 'premium'
-        },
-        {
-            id: 'F002',
-            name: 'Mary Smith',
-            email: 'mary.smith@email.com',
-            phone: '+254700654321',
-            location: 'Nakuru County',
-            farmSize: '75 acres',
-            animalCount: 200,
-            registrationDate: '2024-02-20',
-            status: 'active',
-            lastLogin: '2025-06-30',
-            subscription: 'basic'
-        },
-        {
-            id: 'F003',
-            name: 'Peter Kamau',
-            email: 'peter.kamau@email.com',
-            phone: '+254700987654',
-            location: 'Eldoret County',
-            farmSize: '30 acres',
-            animalCount: 80,
-            registrationDate: '2024-03-10',
-            status: 'pending',
-            lastLogin: 'Never',
-            subscription: 'basic'
+    useEffect(() => {
+        const fetchDashboardStats = async () => {
+            try {
+                const response = await axios.get("/api/dashboard/stats", {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+                setDashboardStats(response.data);
+            } catch (error) {
+                console.error("Failed to fetch dashboard stats:", error);
+            }
+        };
+
+        fetchDashboardStats();
+    }, []);
+
+
+    const [farmers, setFarmers] = useState([]);
+
+    const fetchFarmers = async () => {
+        try {
+            const token = localStorage.getItem("token");
+
+            if (!token) {
+                console.error("No token found. Please log in.");
+                return;
+            }
+
+            const response = await fetch("http://localhost:8080/api/farmers", {
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                    "Content-Type": "application/json"
+                }
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to fetch farmers. Status: ${response.status}. Message: ${errorText}`);
+            }
+
+            const result = await response.json();
+
+            if (result && result.success && Array.isArray(result.data)) {
+                setFarmers(result.data);
+            } else {
+                console.warn("Unexpected response format or no farmers found.");
+                setFarmers([]);
+            }
+        } catch (error) {
+            console.error("Error fetching farmers:", error.message || error);
+            setFarmers([]); // fallback to empty list on error
         }
-    ]);
+    };
+    useEffect(() => {
+        fetchFarmers();
+    }, []);
 
     const [veterinarians, setVeterinarians] = useState([
         {
@@ -474,23 +490,33 @@ const AdminDashboard = () => {
             <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
-            <span className="text-white font-medium text-lg">
-              {user.name.split(' ').map(n => n[0]).join('')}
-            </span>
+<span className="text-white font-medium text-lg">
+  {((user?.name ?? `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim()) || "U")
+      .split(' ')
+      .filter(Boolean)
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()}
+</span>
+
                     </div>
                     <div>
-                        <h3 className="font-semibold text-gray-900">{user.name}</h3>
-                        <p className="text-sm text-gray-600">{user.id}</p>
+                        <h3 className="font-semibold text-gray-900">
+                            {(user?.name ?? `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim()) || "Unknown User"}
+                        </h3>
+
+                        <p className="text-sm text-gray-600">{user?.id ?? "No ID"}</p>
+
                     </div>
                 </div>
                 <div className="flex items-center space-x-2">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-              user.status === 'active' ? 'bg-green-100 text-green-800' :
-                  user.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-          }`}>
-            {user.status}
-          </span>
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+            user?.status === 'active' ? 'bg-green-100 text-green-800' :
+                user?.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+        }`}>
+          {user?.status ?? "unknown"}
+        </span>
                     <div className="relative">
                         <button className="p-1 text-gray-400 hover:text-gray-600">
                             <MoreVertical className="h-4 w-4" />
@@ -1049,21 +1075,44 @@ const AdminDashboard = () => {
                             </div>
 
                             {/* Farmers Grid */}
+                            {/* Farmers Grid */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {farmers.map((farmer) => (
-                                    <UserCard
-                                        key={farmer.id}
-                                        user={farmer}
-                                        type="farmer"
-                                        onEdit={(user) => handleUserAction('edit', user)}
-                                        onDelete={(user) => handleUserAction('delete', user)}
-                                        onView={(user) => handleUserAction('view', user)}
-                                    />
-                                ))}
+                                {farmers && farmers.length > 0 ? (
+                                    farmers
+                                        .filter((farmer) => {
+                                            const fullName = `${farmer.firstName || ''} ${farmer.lastName || ''}`.toLowerCase();
+                                            const email = farmer.email?.toLowerCase() || '';
+                                            const search = searchTerm.toLowerCase();
+
+                                            const matchesSearch =
+                                                fullName.includes(search) || email.includes(search);
+
+                                            return matchesSearch;
+                                        })
+                                        .map((farmer) => {
+                                            const username = `${farmer.firstName || ''} ${farmer.lastName || ''}`.trim();
+                                            return (
+                                                <UserCard
+                                                    key={farmer.id || farmer.email}
+                                                    user={{ ...farmer, username }}
+                                                    type="farmer"
+                                                    onEdit={(user) => handleUserAction("edit", user)}
+                                                    onDelete={(user) => handleUserAction("delete", user)}
+                                                    onView={(user) => handleUserAction("view", user)}
+                                                />
+                                            );
+                                        })
+                                ) : (
+                                    <p className="text-gray-500 col-span-full">
+                                        {farmers.length === 0 ? "No farmers found." : "Loading farmers..."}
+                                    </p>
+                                )}
                             </div>
+
                         </div>
                     </div>
                 )}
+
 
                 {/* Veterinarians Management */}
                 {activeTab === 'veterinarians' && (

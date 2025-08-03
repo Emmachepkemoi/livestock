@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.Authentication;
 import jakarta.validation.Valid;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/user")
 @CrossOrigin(origins = "*")
@@ -42,6 +44,15 @@ public class UserController {
                     .body(new ApiResponse<>(false, "An error occurred while retrieving profile", null));
         }
     }
+
+    // In UserController.java
+    @GetMapping("/users/count-by-role")
+    public ResponseEntity<Map<String, Long>> getUserCountsByRole() {
+        Map<String, Long> counts = userService.countUsersByRole();
+        return ResponseEntity.ok(counts);
+    }
+
+
 
 
 

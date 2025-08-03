@@ -11,7 +11,7 @@ import java.util.List;
 @AllArgsConstructor
 public class FarmerProfileDto {
 
-    private Integer id;                     // FarmerProfile ID
+    private Long id;                     // FarmerProfile ID
 
     private String firstName;
     private String lastName;// Derived from User (firstName + lastName)
@@ -21,4 +21,5 @@ public class FarmerProfileDto {
 
     // List of livestock (can be simplified or partial)
     private List<SimpleLivestockDto> livestock;
+
 }

@@ -46,7 +46,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/health-records/**").hasAnyAuthority("VETERINARIAN", "ADMIN")
                                 .requestMatchers(HttpMethod.GET, "/api/health-records/**").hasAnyAuthority("VETERINARIAN", "ADMIN", "FARMER")
                         .requestMatchers("/api/breeds/**").hasAnyAuthority("FARMER", "ADMIN")
-                        .requestMatchers("/api/livestock/analytics").hasAnyAuthority("FARMER", "ADMIN")
+                                .requestMatchers("/api/users/**").hasAnyAuthority("ADMIN") // or add FARMER if necessary
+                        .requestMatchers("/api/dashboard/**").hasAnyAuthority("ADMIN")
+
+                                .requestMatchers("/api/livestock/analytics").hasAnyAuthority("FARMER", "ADMIN")
 
                         .anyRequest().authenticated()
                 )

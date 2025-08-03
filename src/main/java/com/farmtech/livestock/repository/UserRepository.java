@@ -5,7 +5,6 @@ import com.farmtech.livestock.model.UserRole;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -31,9 +30,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // ✅ New Queries for Role
 
+    // Get all active users with a specific role name (e.g., FARMER)
     @Query("SELECT u FROM User u WHERE u.role.roleName = :roleName AND u.active = true")
     List<User> findAllByRoleName(@Param("roleName") UserRole.RoleName roleName);
 
+    // Get user by username and role
     @Query("SELECT u FROM User u WHERE u.username = :username AND u.role.roleName = :roleName AND u.active = true")
     Optional<User> findByUsernameAndRole(@Param("username") String username, @Param("roleName") UserRole.RoleName roleName);
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.role.roleName = :roleName AND u.active = true")
+    long countByRoleName(@Param("roleName") UserRole.RoleName roleName);
 }

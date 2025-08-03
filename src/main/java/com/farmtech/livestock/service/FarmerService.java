@@ -39,7 +39,7 @@ public class FarmerService {
                 .collect(Collectors.toList());
 
         return new FarmerProfileDto(
-                farmer.getFarmerId(),
+                farmer.getFarmerId().longValue(),
                 farmer.getUser().getFirstName(),
                 farmer.getUser().getLastName(),
 
